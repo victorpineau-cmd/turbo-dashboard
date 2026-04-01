@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Turbo Dashboard — DEGIRO Portfolio Tracker</title>
+<script crossorigin src="https://unpkg.com/react@17/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@17/umd/react-dom.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Source Sans 3',-apple-system,BlinkMacSystemFont,system-ui,sans-serif;background:#fff;color:#1a1a2e;-webkit-font-smoothing:antialiased;font-size:14px;}
+input,select,button{font-family:inherit;}
+input:focus,select:focus{outline:none;border-color:#0066cc !important;}
+::-webkit-scrollbar{width:4px;}::-webkit-scrollbar-thumb{background:#ccc;border-radius:2px;}
+.drop{border:1.5px dashed #99c2e8;border-radius:8px;padding:36px 20px;text-align:center;cursor:pointer;transition:all 0.15s;background:#f7fafd;}
+.drop:hover,.drop.ov{border-color:#0066cc;background:#eef5fc;}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+@keyframes fadeIn{from{opacity:0;transform:translateX(-50%) translateY(-6px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+.anim{animation:pulse 1.5s ease-in-out infinite;}
+.tip{position:relative;cursor:help;border-bottom:1px dotted #aab;}
+.tip .tiptext{visibility:hidden;opacity:0;position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);background:#1a1a2e;color:#fff;padding:8px 12px;border-radius:6px;font-size:11px;line-height:1.4;white-space:pre-line;min-width:220px;max-width:320px;z-index:50;box-shadow:0 4px 12px rgba(0,0,0,.15);pointer-events:none;transition:opacity .15s;}
+.tip .tiptext::after{content:"";position:absolute;top:100%;left:50%;transform:translateX(-50%);border:5px solid transparent;border-top-color:#1a1a2e;}
+.tip:hover .tiptext{visibility:visible;opacity:1;}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState,useEffect,useCallback,useRef}=React;
+
+// ── Amundi palette ──
+const C={blue:"#0A2463",blueM:"#1E3A6E",blueA:"#0066cc",blueL:"#e8f1fa",blueT:"#f5f8fc",grn:"#1a8754",grnBg:"#edf7f1",red:"#c0392b",redBg:"#fdf0ee",org:"#c67700",orgBg:"#fef8ee",txt:"#1a1a2e",t2:"#4a4a5a",t3:"#8a8a9a",t4:"#b0b0be",bdr:"#e0e0ea",bdrL:"#ececf2",bg:"#ffffff",bgS:"#f7f8fa",w:"#ffffff"};
+const mono="'SF Mono','Menlo','Monaco','Consolas',monospace";
+
+// ── Formatting ──
+const fE=v=>"€"+(Math.abs(v)>=1000?v.toLocaleString("fr-FR",{minimumFractionDigits:2,maximumFractionDigits:2}):v.toFixed(2));
+const fS=(v,d=2)=>(v>=0?"+":"")+v.toFixed(d);
+const fP=v=>(v>=0?"+":"")+v.toFixed(2)+"%";
+const fR=v=>v>=10?v.toFixed(2):v>=1?v.toFixed(3):v.toFixed(4);
+
+// ── Defaults ──
+const D_POS=[];  // Start empty — user uploads their DEGIRO screenshot
+const D_EV=[
+  {id:"e1",date:"2026-04-08",title:"ECB Rate Decision",type:"macro",impact:"high",lastFigure:"Deposit rate: 2.50%. Last cut: -25bps (Mar 2026). Markets priced in one more cut by June.",marketImpact:"EUR weakened 0.3% vs USD. European equities rallied +1.2% on dovish guidance."},
+  {id:"e2",date:"2026-04-10",title:"US CPI Release",type:"macro",impact:"high",lastFigure:"Feb 2026: +2.8% YoY headline, +3.1% core. Above expectations (+2.7% / +3.0%).",marketImpact:"10Y yield jumped 8bps to 4.35%. Tech sold off -1.8%. Rate cut expectations pushed back."},
+  {id:"e3",date:"2026-04-24",title:"Thales Q1 Earnings",type:"earnings",impact:"high",lastFigure:"FY2025: Revenue €20.1B (+12%), order intake €24.8B. Guidance raised for FY2026.",marketImpact:"Stock rallied +6.3% on results day. Defense sector followed +2.5%."},
+  {id:"e4",date:"2026-05-07",title:"FOMC Rate Decision",type:"macro",impact:"high",lastFigure:"Fed Funds: 4.25-4.50%. Held steady since Jan 2026. Dot plot signals 2 cuts in 2026.",marketImpact:"S&P 500 +0.8%. Dollar index flat. Powell emphasized data-dependency."},
+  {id:"e5",date:"2026-05-28",title:"NVIDIA Earnings (Q1 FY27)",type:"earnings",impact:"high",lastFigure:"Q4 FY26: Revenue $39.3B (+78% YoY). Data center $32.8B. Guidance Q1: $42B ±2%.",marketImpact:"Stock +8.5% after-hours. Entire semi sector lifted. MU +4.2% sympathy."},
+  {id:"e6",date:"2026-06-18",title:"FOMC Rate Decision",type:"macro",impact:"high",lastFigure:"See May meeting above. Market pricing ~60% probability of first cut at this meeting.",marketImpact:"Key catalyst for H2 direction. Rate-sensitive tech would rally on cut confirmation."},
+  {id:"e7",date:"2026-06-25",title:"Micron Earnings (Q3 FY26)",type:"earnings",impact:"high",lastFigure:"Q2 FY26: Revenue $8.7B (+42% YoY). HBM revenue $1.8B. Gross margin 37.5%.",marketImpact:"Stock +5.1% on beat. HBM demand narrative reinforced. DRAM pricing stable."}
+];
+
+// ── Math ──
+const tP=p=>p.currentPrice<=p.strike?0:(p.currentPrice-p.strike)/p.ratio/p.fxRate;
+const bf=p=>p.currentPrice<=0?0:((p.currentPrice-p.barrier)/p.currentPrice)*100;
+const pV=p=>p.quantity*tP(p);
+const uPL=p=>(tP(p)-p.entryPriceTurbo)*p.quantity;
+const dl=p=>p.quantity*(1/p.ratio)*(1/p.fxRate);
+const bI=b=>{if(b>=25)return{l:"Safe",c:C.grn};if(b>=15)return{l:"Moderate",c:C.blueA};if(b>=8)return{l:"Elevated",c:C.org};return{l:"Danger",c:C.red};};
+const dTo=d=>{const n=new Date();n.setHours(0,0,0,0);return Math.ceil((new Date(d)-n)/86400000);};
+const tod=()=>new Date().toISOString().slice(0,10);
+const ld=(k,d)=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch{return d;}};
+const sv=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch{}};
+
+// ── Tooltip metric ──
+function Metric({label,value,sub,color,formula}){
+  const inner=<div style={{padding:"10px 12px",background:C.bgS,borderRadius:6,border:"1px solid "+C.bdrL}}>
+    <div style={{fontSize:10,fontWeight:600,color:C.t3,textTransform:"uppercase",letterSpacing:".06em",marginBottom:3}}>{label}</div>
+    <div style={{fontSize:15,fontWeight:700,color:color||C.txt,fontFamily:mono,letterSpacing:"-.01em"}}>{value}</div>
+    {sub&&<div style={{fontSize:10,color:color||C.t3,fontFamily:mono,marginTop:1}}>{sub}</div>}
+  </div>;
+  if(!formula)return inner;
+  return <div className="tip">{inner}<div className="tiptext">{formula}</div></div>;
+}
+
+// ── SVG Chart ──
+function Chart({data,keys,colors,w:cw=700,h:ch=200,zero=false,unit="€",refs=[]}){
+  if(!data||data.length<2)return <div style={{textAlign:"center",padding:28,color:C.t3,fontSize:13}}>Minimum 2 data points required</div>;
+  const P={t:14,r:52,b:24,l:48};const W=cw-P.l-P.r;const H=ch-P.t-P.b;
+  let av=[];keys.forEach(k=>data.forEach(d=>{if(d[k]!=null)av.push(d[k]);}));refs.forEach(r=>av.push(r.y));if(zero)av.push(0);
+  let mn=Math.min(...av),mx=Math.max(...av);if(mn===mx){mn-=10;mx+=10;}const rng=mx-mn;mn-=rng*.05;mx+=rng*.05;
+  const sx=i=>P.l+(i/(data.length-1))*W;const sy=v=>P.t+(1-(v-mn)/(mx-mn))*H;
+  const yt=[];for(let i=0;i<=4;i++)yt.push(mn+((mx-mn)/4)*i);
+  return <svg width="100%" viewBox={`0 0 ${cw} ${ch}`} style={{display:"block"}}>
+    {yt.map((v,i)=><g key={i}><line x1={P.l} y1={sy(v)} x2={cw-P.r} y2={sy(v)} stroke={C.bdrL} strokeWidth=".5"/><text x={P.l-5} y={sy(v)+3} textAnchor="end" fontSize="9" fill={C.t3} fontFamily={mono}>{unit==="€"?"€"+v.toFixed(0):v.toFixed(0)+"%"}</text></g>)}
+    {data.map((d,i)=>{if(data.length<=8||i%(Math.floor(data.length/5))===0||i===data.length-1)return <text key={i} x={sx(i)} y={ch-4} textAnchor="middle" fontSize="9" fill={C.t3} fontFamily={mono}>{d.date}</text>;return null;})}
+    {refs.map((r,i)=><g key={"r"+i}><line x1={P.l} y1={sy(r.y)} x2={cw-P.r} y2={sy(r.y)} stroke={r.c} strokeDasharray="4,3" strokeWidth=".7"/><text x={cw-P.r+3} y={sy(r.y)+3} fontSize="8" fill={r.c} fontFamily={mono}>{r.l}</text></g>)}
+    {zero&&<line x1={P.l} y1={sy(0)} x2={cw-P.r} y2={sy(0)} stroke={C.t4} strokeDasharray="3,3" strokeWidth=".5"/>}
+    {keys.map((k,ki)=>{const pts=data.map((d,i)=>d[k]!=null?{x:sx(i),y:sy(d[k])}:null).filter(Boolean);if(pts.length<2)return null;const path=pts.map((p,i)=>(i===0?"M":"L")+p.x+","+p.y).join(" ");const fill=path+"L"+pts[pts.length-1].x+","+sy(mn)+"L"+pts[0].x+","+sy(mn)+"Z";const c=colors[ki%colors.length];
+      return <g key={k}><path d={fill} fill={c} fillOpacity=".05"/><path d={path} fill="none" stroke={c} strokeWidth="1.5"/>{pts.map((p,i)=><circle key={i} cx={p.x} cy={p.y} r="2.5" fill={C.w} stroke={c} strokeWidth="1.5"/>)}</g>;})}
+    {keys.length>1&&keys.map((k,i)=><g key={"lg"+i} transform={`translate(${P.l+i*130},${ch})`}><line x1="0" y1="-2" x2="12" y2="-2" stroke={colors[i%colors.length]} strokeWidth="2"/><text x="16" y="0" fontSize="9" fill={C.t2}>{k}</text></g>)}
+  </svg>;
+}
+
+// ── UI ──
+const Card=({children,style,...p})=><div style={{background:C.bg,borderRadius:4,border:"1px solid "+C.bdr,padding:"20px 22px",marginBottom:12,...style}} {...p}>{children}</div>;
+const Lbl=({children,style})=><div style={{fontSize:10,fontWeight:600,color:C.t3,textTransform:"uppercase",letterSpacing:".07em",marginBottom:3,...style}}>{children}</div>;
+function Btn({children,v="primary",style,...props}){
+  const s={primary:{background:C.blueA,color:C.w,padding:"8px 18px"},sec:{background:C.blueL,color:C.blueA,padding:"7px 14px"},ghost:{background:"transparent",color:C.t2,padding:"7px 10px"},danger:{background:C.redBg,color:C.red,padding:"7px 14px"}};
+  return <button style={{border:"none",borderRadius:4,fontWeight:600,fontSize:13,cursor:"pointer",fontFamily:"inherit",display:"inline-flex",alignItems:"center",gap:5,...s[v],...style}} {...props}>{children}</button>;
+}
+const Inp=({label,...p})=><div style={{marginBottom:9}}>{label&&<Lbl>{label}</Lbl>}<input style={{background:C.bgS,border:"1px solid "+C.bdr,borderRadius:4,padding:"8px 11px",color:C.txt,fontFamily:mono,fontSize:13,width:"100%",outline:"none",boxSizing:"border-box"}} {...p}/></div>;
+const Sel=({label,children,...p})=><div style={{marginBottom:9}}>{label&&<Lbl>{label}</Lbl>}<select style={{background:C.bgS,border:"1px solid "+C.bdr,borderRadius:4,padding:"8px 11px",color:C.txt,fontFamily:mono,fontSize:13,width:"100%",outline:"none",boxSizing:"border-box"}} {...p}>{children}</select></div>;
+const Divider=()=><div style={{height:1,background:C.bdr,margin:"16px 0"}}/>;
+
+// ══════════ SCREENSHOT ══════════
+function Screenshotter({positions,apiKey,onUpdate,onClose}){
+  const [st,setSt]=useState("idle");const [prev,setPrev]=useState(null);const [res,setRes]=useState(null);const [err,setErr]=useState("");const [drag,setDrag]=useState(false);const ref=useRef();
+  const go=async file=>{
+    if(!file?.type.startsWith("image/"))return;setSt("loading");setErr("");setRes(null);
+    const rdr=new FileReader();
+    rdr.onload=async e=>{
+      const b64=e.target.result;setPrev(b64);
+      if(!apiKey){setErr("Set API key in Strategy tab.");setSt("error");return;}
+      setSt("analyzing");
+      try{
+        const r=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",
+          headers:{"Content-Type":"application/json","x-api-key":apiKey,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
+          body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1500,
+            messages:[{role:"user",content:[
+              {type:"image",source:{type:"base64",media_type:file.type,data:b64.split(",")[1]}},
+              {type:"text",text:`Analyze this DEGIRO portfolio screenshot (French). Extract precisely:
+
+Per position:
+- name: full product name
+- cours: COURS column (current turbo price, e.g. 1.03)
+- quantity: QTÉ (French: "1.059"=1059)
+- valeur: VALEUR column
+- pru: PRU column (entry price, e.g. 0.614461)
+- plEur: P/L € column (daily, e.g. +148.26)
+- plPct: P/L % column (daily, e.g. +15.73)
+- plLatentEur: P/L LATENT € (unrealized total)
+- plLatentPct: P/L LATENT %
+- barrier: number after "BAR" in product name
+- strike: number after "STR" in product name
+- ratio: integer after "R " in product name (e.g. 50)
+- leverage: number after "LV" in product name (e.g. 5.65) — EXACT from name, not calculated
+
+Header:
+- totalCompte: Total Compte
+- totalPortefeuille: Portefeuille
+- dailyPnlEur: P/L Journalière €
+- dailyPnlPct: P/L Journalière %
+
+JSON only. No markdown/backticks.
+{"positions":[{...}],"totalCompte":0,"totalPortefeuille":0,"dailyPnlEur":0,"dailyPnlPct":0}`}
+            ]}]})});
+        const d=await r.json();if(d.error){setErr(d.error.message);setSt("error");return;}
+        setRes(JSON.parse(d.content.map(c=>c.text||"").join("").replace(/```json|```/g,"").trim()));setSt("done");
+      }catch(e){setErr(e.message);setSt("error");}
+    };rdr.readAsDataURL(file);
+  };
+  const apply=()=>{
+    if(!res)return;const ups=[];const newPos=[];
+    (res.positions||[]).forEach((rp,idx)=>{
+      const m=positions.find(p=>{if(rp.barrier&&Math.abs(p.barrier-rp.barrier)<1)return true;const rl=(rp.name||"").toLowerCase(),pl=(p.name+" "+p.underlying).toLowerCase();for(const kw of["micron","thales","nvidia","boeing","airbus","dassault","amazon","microsoft","alphabet"])if(rl.includes(kw)&&pl.includes(kw))return true;return false;});
+      const qty=typeof rp.quantity==="number"?rp.quantity:parseInt(String(rp.quantity).replace(/\./g,""));
+      const ratio=rp.ratio||50;const bar=rp.barrier||0;const cours=rp.cours||0;
+      // Detect underlying name from product name
+      const nameL=(rp.name||"").toLowerCase();
+      const detect=n=>{for(const[kw,info]of[["micron",{u:"Micron (MU)",c:"USD",fx:1.08}],["thales",{u:"Thales (HO.PA)",c:"EUR",fx:1}],["nvidia",{u:"NVIDIA (NVDA)",c:"USD",fx:1.08}],["alphabet",{u:"Alphabet (GOOGL)",c:"USD",fx:1.08}],["amazon",{u:"Amazon (AMZN)",c:"USD",fx:1.08}],["microsoft",{u:"Microsoft (MSFT)",c:"USD",fx:1.08}],["airbus",{u:"Airbus (AIR.PA)",c:"EUR",fx:1}],["boeing",{u:"Boeing (BA)",c:"USD",fx:1.08}],["dassault",{u:"Dassault Aviation (AM.PA)",c:"EUR",fx:1}]])if(n.includes(kw))return info;return{u:"Unknown",c:"EUR",fx:1};};
+      if(m){
+        // Update existing
+        const u={};
+        if(qty>0)u.quantity=qty;if(rp.pru>0)u.entryPriceTurbo=rp.pru;if(rp.barrier)u.barrier=rp.barrier;if(rp.strike)u.strike=rp.strike||rp.barrier;
+        if(rp.ratio>0)u.ratio=rp.ratio;if(rp.leverage>0)u.leverage=rp.leverage;
+        if(rp.plEur!=null)u.dailyPlEur=rp.plEur;if(rp.plPct!=null)u.dailyPlPct=rp.plPct;
+        if(cours&&ratio&&bar){u.currentPrice=m.currency==="USD"?+(cours*m.fxRate*ratio+bar).toFixed(2):+(cours*ratio+bar).toFixed(2);}
+        ups.push({id:m.id,...u});
+      }else{
+        // Create new position
+        const info=detect(nameL);
+        const shortName=(rp.name||"").replace(/^SG\s+/i,"").split("Turbo")[0].trim()+" Turbo "+(nameL.includes("put")?"Put":"Call");
+        const curP=cours&&ratio&&bar?(info.c==="USD"?+(cours*info.fx*ratio+bar).toFixed(2):+(cours*ratio+bar).toFixed(2)):0;
+        newPos.push({
+          id:"p_"+Date.now()+"_"+idx,name:shortName,underlying:info.u,
+          currentPrice:curP,barrier:rp.barrier||0,strike:rp.strike||rp.barrier||0,
+          ratio:ratio,quantity:qty||0,entryPriceTurbo:rp.pru||cours||0,
+          currency:info.c,fxRate:info.fx,stopLoss:0,profitTarget:0,
+          leverage:rp.leverage||0,dailyPlEur:rp.plEur||0,dailyPlPct:rp.plPct||0
+        });
+      }
+    });
+    onUpdate(ups,{dailyPnlEur:res.dailyPnlEur||0,dailyPnlPct:res.dailyPnlPct||0},newPos);onClose();
+  };
+  return <div style={{position:"fixed",inset:0,background:"rgba(26,26,46,0.4)",backdropFilter:"blur(4px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:100,padding:16}} onClick={onClose}>
+    <Card style={{maxWidth:480,width:"100%",boxShadow:"0 8px 30px rgba(0,0,0,.12)",maxHeight:"90vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
+      <div style={{fontSize:17,fontWeight:700,color:C.blue,marginBottom:12}}>Update from Screenshot</div>
+      {st!=="done"&&<div className={`drop${drag?" ov":""}`} onDragOver={e=>{e.preventDefault();setDrag(true);}} onDragLeave={()=>setDrag(false)} onDrop={e=>{e.preventDefault();setDrag(false);go(e.dataTransfer.files[0]);}} onClick={()=>ref.current?.click()}>
+        <input ref={ref} type="file" accept="image/*" style={{display:"none"}} onChange={e=>go(e.target.files[0])}/>
+        {st==="idle"&&<><div style={{fontSize:14,fontWeight:600,color:C.blue}}>Drop your DEGIRO screenshot here</div><div style={{fontSize:12,color:C.t3,marginTop:4}}>or click to browse files</div></>}
+        {st==="loading"&&<div style={{color:C.blueA}}>Reading image...</div>}
+        {st==="analyzing"&&<div className="anim"><div style={{fontSize:14,fontWeight:600,color:C.blueA}}>Analyzing portfolio data...</div></div>}
+        {st==="error"&&<div style={{color:C.red,fontWeight:500}}>{err}</div>}
+      </div>}
+      {prev&&<img src={prev} style={{width:"100%",borderRadius:4,marginTop:10,border:"1px solid "+C.bdr}} alt=""/>}
+      {st==="done"&&res&&<div style={{marginTop:14}}>
+        <div style={{background:C.grnBg,borderRadius:4,padding:12,marginBottom:10,fontSize:13,color:C.grn,fontWeight:600}}>Data extracted successfully</div>
+        {(res.positions||[]).map((rp,i)=><div key={i} style={{background:C.bgS,borderRadius:4,padding:10,marginBottom:6,fontSize:12,fontFamily:mono,color:C.t2,border:"1px solid "+C.bdrL}}>
+          <div style={{fontWeight:600,fontFamily:"inherit",marginBottom:4,color:C.txt}}>{(rp.name||"").substring(0,55)}</div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:3}}>
+            <div>Cours: €{rp.cours}</div><div>PRU: {rp.pru}</div><div>Qty: {rp.quantity}</div>
+            <div>BAR: {rp.barrier}</div><div>R: {rp.ratio}</div><div>LV: {rp.leverage}x</div>
+          </div>
+        </div>)}
+        <div style={{display:"flex",gap:8,marginTop:10}}><Btn onClick={apply} style={{flex:1,justifyContent:"center"}}>Apply Update</Btn><Btn v="ghost" onClick={()=>{setSt("idle");setPrev(null);setRes(null);}}>Retry</Btn></div>
+      </div>}
+      <div style={{textAlign:"right",marginTop:8}}><Btn v="ghost" onClick={onClose}>Close</Btn></div>
+    </Card>
+  </div>;
+}
+
+// ══════════ STRATEGY ANALYZER ══════════
+function runStrategy(pos,events,apiKey,cb){
+  if(!apiKey)return cb("Set API key first.");
+  const pd=pos.map(p=>({name:p.name,underlying:p.underlying,turboPrice:+tP(p).toFixed(4),entryPrice:p.entryPriceTurbo,buffer:+bf(p).toFixed(1),leverage:p.leverage,underlyingPrice:p.currentPrice,barrier:p.barrier,strike:p.strike,ratio:p.ratio,quantity:p.quantity,value:+pV(p).toFixed(2),unrealizedPnL:+uPL(p).toFixed(2),unrealizedPct:p.entryPriceTurbo>0?+((uPL(p)/(p.entryPriceTurbo*p.quantity))*100).toFixed(1):0,dailyPlEur:p.dailyPlEur||0,dailyPlPct:p.dailyPlPct||0,currency:p.currency,fxRate:p.fxRate}));
+  const ev=events.filter(e=>dTo(e.date)>=0&&dTo(e.date)<=21).map(e=>({title:e.title,date:e.date,daysAway:dTo(e.date),type:e.type}));
+  fetch("https://api.anthropic.com/v1/messages",{method:"POST",
+    headers:{"Content-Type":"application/json","x-api-key":apiKey,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
+    body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:2500,
+      messages:[{role:"user",content:`You are a senior trading strategist for leveraged Turbo certificates.
+
+PORTFOLIO:
+${JSON.stringify(pd,null,1)}
+
+UPCOMING EVENTS (next 21 days):
+${JSON.stringify(ev,null,1)}
+
+Provide strategy analysis as JSON (no markdown, no backticks):
+{
+  "summary": "2-3 sentence overall assessment. Be direct.",
+  "riskLevel": "LOW/MODERATE/ELEVATED/HIGH",
+  "actions": [
+    {
+      "type": "SET_STOP_LOSS/TAKE_PROFIT/SCALE_OUT/HOLD/REDUCE_BEFORE_EVENT",
+      "position": "position name",
+      "urgency": "IMMEDIATE/THIS_WEEK/MONITOR",
+      "turboPrice": number or null (specific EUR price for the turbo),
+      "underlyingPrice": number or null,
+      "quantity": number or null (how many units to sell/buy),
+      "profitOrLoss": number or null (EUR amount this action would lock in or prevent),
+      "reasoning": "2-3 sentences. Include the math. Reference buffer %, leverage, and upcoming events."
+    }
+  ],
+  "positionSummaries": [
+    {
+      "name": "position name",
+      "status": "1 sentence current status",
+      "actionNeeded": true/false,
+      "priority": "HIGH/MEDIUM/LOW"
+    }
+  ],
+  "keyRisks": ["risk 1", "risk 2"],
+  "outlook": "2-3 sentence forward view"
+}
+
+RULES:
+- For STOP_LOSS: calculate the turbo price where buffer = 8%, and suggest setting stop just above
+- For SCALE_OUT: suggest selling 30-50% when unrealized > 40%. Calculate exact quantity and EUR proceeds.
+- For REDUCE_BEFORE_EVENT: if a binary event is within 7 days, suggest reducing by 30-50%. Calculate.
+- Always include quantity and profitOrLoss for actionable recommendations.
+- Never recommend buying more. Only protective actions and profit-taking.`}]
+    })
+  }).then(r=>r.json()).then(d=>{
+    if(d.error)return cb(d.error.message);
+    cb(null,JSON.parse(d.content.map(c=>c.text||"").join("").replace(/```json|```/g,"").trim()));
+  }).catch(e=>cb(e.message));
+}
+
+// ══════════ APP ══════════
+function App(){
+  const [pos,setPos]=useState(()=>ld("td10-pos",D_POS));
+  const [events,setEvents]=useState(()=>ld("td10-ev",D_EV));
+  const [snaps,setSnaps]=useState(()=>ld("td10-snap",[]));
+  const [daily,setDaily]=useState(()=>ld("td10-daily",{eur:0,pct:0}));
+  const [strategy,setStrat]=useState(()=>ld("td10-strat",null));
+  const [stratLoad,setStratLoad]=useState(false);
+  const [apiKey,setApiKey]=useState(()=>localStorage.getItem("td-api-key")||"");
+  const [tab,setTab]=useState("portfolio");
+  const [chartV,setChartV]=useState("pnl");
+  const [showSS,setShowSS]=useState(false);
+  const [showAddEv,setShowAddEv]=useState(false);
+  const [closeM,setCloseM]=useState(null);
+  const [cQ,setCQ]=useState("");const [cP,setCP]=useState("");
+  const [toast,setToast]=useState(null);
+  const show=m=>{setToast(m);setTimeout(()=>setToast(null),2500);};
+  const saveApi=k=>{setApiKey(k);localStorage.setItem("td-api-key",k);};
+
+  useEffect(()=>sv("td10-pos",pos),[pos]);useEffect(()=>sv("td10-ev",events),[events]);
+  useEffect(()=>sv("td8-snap",snaps),[snaps]);useEffect(()=>sv("td10-daily",daily),[daily]);
+  useEffect(()=>sv("td10-strat",strategy),[strategy]);
+
+  const snap=useCallback(()=>{
+    const now=new Date();const d=(now.getMonth()+1).toString().padStart(2,"0")+"-"+now.getDate().toString().padStart(2,"0")+" "+now.getHours().toString().padStart(2,"0")+":"+now.getMinutes().toString().padStart(2,"0");
+    const pd={};let tv=0,tc=0;
+    pos.forEach(p=>{const v=pV(p);tv+=v;tc+=p.entryPriceTurbo*p.quantity;pd[p.id]={name:p.name,price:p.currentPrice,buffer:+bf(p).toFixed(1),value:+v.toFixed(2)};});
+    const sn={date:d,totalValue:+tv.toFixed(2),unrealizedPnL:+(tv-tc).toFixed(2),dailyPnlEur:daily.eur,positions:pd};
+    setSnaps(pr=>[...pr,sn].slice(-90));
+  },[pos,daily]);
+
+  const [pendSnap,setPendSnap]=useState(false);
+  const handleUpdate=(ups,meta,newPositions)=>{
+    if(ups?.length){
+      setPos(ps=>{let n=[...ps];ups.forEach(u=>{const{id,...r}=u;n=n.map(p=>p.id===id?{...p,...r}:p);});return n;});
+    }
+    if(newPositions?.length){
+      setPos(ps=>[...ps,...newPositions]);
+    }
+    if(meta)setDaily({eur:meta.dailyPnlEur||0,pct:meta.dailyPnlPct||0});
+    setPendSnap(true);show("Portfolio updated");
+    if(apiKey)setTimeout(()=>{setStratLoad(true);runStrategy(pos,events,apiKey,(e,r)=>{setStratLoad(false);if(!e)setStrat(r);});},400);
+  };
+  useEffect(()=>{if(pendSnap){snap();setPendSnap(false);}},[pos,pendSnap]);
+
+  const tV=pos.reduce((s,p)=>s+pV(p),0);const tC=pos.reduce((s,p)=>s+p.entryPriceTurbo*p.quantity,0);
+  const tU=tV-tC;const tUP=tC>0?(tU/tC)*100:0;
+  const upcoming=[...events].filter(e=>dTo(e.date)>=0).sort((a,b)=>new Date(a.date)-new Date(b.date)).slice(0,6);
+  const urgent=upcoming.filter(e=>dTo(e.date)<=7);
+
+  const pnlD=snaps.map(s=>({date:s.date,Unrealized:s.unrealizedPnL,Daily:s.dailyPnlEur||0,Value:s.totalValue}));
+  const bfN=pos.map(p=>p.name);
+  const bfD=snaps.map(s=>{const e={date:s.date};Object.values(s.positions||{}).forEach(d=>{e[d.name]=d.buffer;});return e;});
+
+  const tabs=[{k:"portfolio",l:"Portfolio"},{k:"strategy",l:"Strategy"},{k:"charts",l:"Charts"},{k:"events",l:"Events"}];
+
+  return <div style={{background:C.bg,minHeight:"100vh"}}>
+    {toast&&<div style={{position:"fixed",top:12,left:"50%",transform:"translateX(-50%)",zIndex:200,background:C.blue,color:C.w,padding:"9px 22px",borderRadius:4,fontWeight:600,fontSize:13,boxShadow:"0 4px 12px rgba(0,0,0,.15)",animation:"fadeIn .25s"}}>{toast}</div>}
+
+    {/* ═══ HEADER ═══ */}
+    <div style={{background:C.blue,padding:"16px 20px 18px",color:C.w}}>
+      <div style={{maxWidth:800,margin:"0 auto"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:14}}>
+          <div>
+            <div style={{fontSize:11,fontWeight:400,opacity:.55,letterSpacing:".05em",textTransform:"uppercase",marginBottom:2}}>Turbo Dashboard</div>
+            <div style={{fontSize:30,fontWeight:700,letterSpacing:"-.03em",fontFamily:mono}}>{fE(tV)}</div>
+          </div>
+          <button onClick={()=>setShowSS(true)} style={{background:"rgba(255,255,255,.12)",color:C.w,border:"1px solid rgba(255,255,255,.2)",borderRadius:4,padding:"9px 18px",fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>Update</button>
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+          <div style={{background:"rgba(255,255,255,.08)",borderRadius:4,padding:"10px 14px"}}>
+            <div style={{fontSize:10,opacity:.5,textTransform:"uppercase",letterSpacing:".05em",marginBottom:2}}>Daily P&L</div>
+            <div style={{fontSize:20,fontWeight:700,color:daily.eur>=0?"#4ade80":"#f87171",fontFamily:mono}}>{fS(daily.eur)}</div>
+            <div style={{fontSize:12,color:daily.pct>=0?"#4ade80":"#f87171",opacity:.8}}>{fP(daily.pct)}</div>
+          </div>
+          <div style={{background:"rgba(255,255,255,.08)",borderRadius:4,padding:"10px 14px"}}>
+            <div style={{fontSize:10,opacity:.5,textTransform:"uppercase",letterSpacing:".05em",marginBottom:2}}>Unrealized P&L</div>
+            <div style={{fontSize:20,fontWeight:700,color:tU>=0?"#4ade80":"#f87171",fontFamily:mono}}>{fS(tU)}</div>
+            <div style={{fontSize:12,color:tUP>=0?"#4ade80":"#f87171",opacity:.8}}>{fP(tUP)}</div>
+          </div>
+        </div>
+        {urgent.length>0&&<div style={{marginTop:10,fontSize:11,color:"#fbbf24"}}>{urgent.length} event{urgent.length>1?"s":""} within 7 days</div>}
+        {snaps.length>0&&<div style={{marginTop:urgent.length>0?4:10,fontSize:10,opacity:.4}}>Last update: {snaps[snaps.length-1].date} — {snaps.length} snapshots recorded</div>}
+      </div>
+    </div>
+
+    {showSS&&<Screenshotter positions={pos} apiKey={apiKey} onUpdate={handleUpdate} onClose={()=>setShowSS(false)}/>}
+
+    {/* ═══ TABS ═══ */}
+    <div style={{borderBottom:"1px solid "+C.bdr,background:C.w,position:"sticky",top:0,zIndex:20}}>
+      <div style={{maxWidth:800,margin:"0 auto",display:"flex"}}>
+        {tabs.map(t=><button key={t.k} onClick={()=>setTab(t.k)} style={{background:"none",border:"none",borderBottom:tab===t.k?"2px solid "+C.blueA:"2px solid transparent",color:tab===t.k?C.blueA:C.t3,padding:"12px 20px",cursor:"pointer",fontSize:13,fontWeight:600,fontFamily:"inherit"}}>{t.l}</button>)}
+      </div>
+    </div>
+
+    <div style={{maxWidth:800,margin:"0 auto",padding:"18px 16px"}}>
+
+    {/* ═══ PORTFOLIO ═══ */}
+    {tab==="portfolio"&&<>
+      {pos.length===0&&<Card style={{textAlign:"center",padding:"40px 24px"}}>
+        <div style={{fontSize:20,fontWeight:700,color:C.blue,marginBottom:8}}>Welcome to Turbo Dashboard</div>
+        <div style={{fontSize:14,color:C.t2,lineHeight:1.6,maxWidth:420,margin:"0 auto",marginBottom:20}}>
+          Track your DEGIRO leveraged certificates with real-time P&L, buffer monitoring, strategy recommendations, and event calendars.
+        </div>
+        <div style={{fontSize:13,color:C.t2,lineHeight:1.7,textAlign:"left",maxWidth:380,margin:"0 auto",marginBottom:24}}>
+          <div style={{marginBottom:10}}><span style={{fontWeight:700,color:C.blue}}>1.</span> Enter your Anthropic API key in the <span style={{fontWeight:600}}>Strategy</span> tab</div>
+          <div style={{marginBottom:10}}><span style={{fontWeight:700,color:C.blue}}>2.</span> Take a screenshot of your DEGIRO portfolio page</div>
+          <div><span style={{fontWeight:700,color:C.blue}}>3.</span> Click <span style={{fontWeight:600}}>Update</span> above and drop the screenshot — your positions will be created automatically</div>
+        </div>
+        <Btn onClick={()=>setShowSS(true)} style={{fontSize:14,padding:"12px 28px"}}>Upload your first screenshot</Btn>
+        <div style={{fontSize:11,color:C.t3,marginTop:16}}>All data stays in your browser. Nothing is stored on any server.</div>
+      </Card>}
+      {pos.map(p=>{
+        const b=bf(p),bi=bI(b),tp=tP(p),up=uPL(p),val=pV(p);
+        const upP=p.entryPriceTurbo>0?(up/(p.entryPriceTurbo*p.quantity))*100:0;
+        const alloc=tV>0?(val/tV)*100:0;
+        const imp=dl(p)*p.currentPrice*0.01;
+        return <Card key={p.id}>
+          {/* Header */}
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:14}}>
+            <div>
+              <div style={{fontSize:16,fontWeight:700,color:C.blue}}>{p.name}</div>
+              <div style={{fontSize:12,color:C.t3}}>{p.underlying} — {p.quantity.toLocaleString()} units</div>
+            </div>
+            <div style={{display:"flex",gap:6}}>
+              <Btn v="sec" onClick={()=>setCloseM(p)} style={{fontSize:12}}>Scale Out</Btn>
+              <Btn v="danger" onClick={()=>setPos(ps=>ps.filter(x=>x.id!==p.id))} style={{fontSize:12,padding:"6px 10px"}}>Remove</Btn>
+            </div>
+          </div>
+
+          {/* Buffer */}
+          <div style={{background:C.bgS,borderRadius:4,padding:"12px 16px",marginBottom:14,border:"1px solid "+C.bdrL}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+              <span style={{fontSize:10,fontWeight:600,color:C.t3,textTransform:"uppercase",letterSpacing:".06em"}}>Buffer to Knock-Out</span>
+              <span style={{fontSize:10,fontWeight:700,color:bi.c,textTransform:"uppercase"}}>{bi.l}</span>
+            </div>
+            <div className="tip" style={{display:"inline-block"}}>
+              <div style={{fontSize:26,fontWeight:700,color:bi.c,fontFamily:mono,letterSpacing:"-.03em"}}>{b.toFixed(1)}%</div>
+              <div className="tiptext">Buffer = (Underlying − Barrier) / Underlying × 100{"\n"}= ({p.currentPrice} − {p.barrier}) / {p.currentPrice} × 100{"\n"}= {b.toFixed(2)}%</div>
+            </div>
+            <div style={{height:4,background:C.bdrL,borderRadius:2,marginTop:6,overflow:"hidden"}}><div style={{width:Math.min(b,50)*2+"%",height:"100%",background:bi.c,borderRadius:2}}/></div>
+            <div style={{fontSize:11,color:C.t3,marginTop:6}}>Barrier: {p.currency==="USD"?"$":"€"}{p.barrier} — Underlying: {p.currency==="USD"?"$":"€"}{p.currentPrice}</div>
+          </div>
+
+          {/* Daily P&L */}
+          {(p.dailyPlEur||p.dailyPlPct)?<div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",marginBottom:10,borderBottom:"1px solid "+C.bdrL}}>
+            <span style={{fontSize:12,color:C.t2}}>Today's P&L</span>
+            <div style={{display:"flex",gap:8,alignItems:"baseline"}}>
+              <span style={{fontSize:15,fontWeight:700,color:p.dailyPlEur>=0?C.grn:C.red,fontFamily:mono}}>{fS(p.dailyPlEur)}</span>
+              <span style={{fontSize:12,color:p.dailyPlPct>=0?C.grn:C.red,fontFamily:mono}}>{fP(p.dailyPlPct)}</span>
+            </div>
+          </div>:null}
+
+          {/* Metrics grid */}
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(125px,1fr))",gap:6}}>
+            <Metric label="Turbo Price" value={"€"+fR(tp)} formula={`Turbo = (Underlying − Strike) / Ratio / FX\n= (${p.currentPrice} − ${p.strike}) / ${p.ratio} / ${p.fxRate}\n= €${fR(tp)}`}/>
+            <Metric label="Leverage" value={p.leverage+"x"} color={p.leverage>10?C.red:p.leverage>7?C.org:C.txt} formula={`Leverage from product name: LV ${p.leverage}\nCalculated: ${p.currentPrice} / (${p.currentPrice} − ${p.strike}) = ${(p.currentPrice/(p.currentPrice-p.strike)).toFixed(2)}x`}/>
+            <Metric label="Position Value" value={fE(val)} formula={`Value = Quantity × Turbo Price\n= ${p.quantity} × €${fR(tp)}\n= ${fE(val)}`}/>
+            <Metric label="Unrealized P&L" value={fS(up)} sub={fP(upP)} color={up>=0?C.grn:C.red} formula={`P&L = (Current Turbo − Entry) × Qty\n= (€${fR(tp)} − €${p.entryPriceTurbo.toFixed(4)}) × ${p.quantity}\n= ${fS(up)}`}/>
+            <Metric label="PRU (Entry)" value={"€"+p.entryPriceTurbo.toFixed(4)} formula={`PRU = Prix de Revient Unitaire\nYour average cost per turbo certificate.\nFrom DEGIRO: €${p.entryPriceTurbo.toFixed(6)}`}/>
+            <Metric label="Delta" value={"€"+dl(p).toFixed(2)} formula={`Delta = Qty × (1/Ratio) × (1/FX)\n= ${p.quantity} × (1/${p.ratio}) × (1/${p.fxRate})\n= €${dl(p).toFixed(2)} per $1 move`}/>
+            <Metric label="1% Impact" value={fE(imp)} formula={`Impact = Delta × Underlying × 1%\n= ${dl(p).toFixed(2)} × ${p.currentPrice} × 0.01\n= ${fE(imp)} (${(imp/tV*100).toFixed(1)}% of portfolio)`}/>
+            <Metric label="Weight" value={alloc.toFixed(1)+"%"} formula={`Allocation = Position Value / Total\n= ${fE(val)} / ${fE(tV)}\n= ${alloc.toFixed(1)}%`}/>
+          </div>
+        </Card>;
+      })}
+
+      {/* Scale Out Modal */}
+      {closeM&&<div style={{position:"fixed",inset:0,background:"rgba(26,26,46,.4)",backdropFilter:"blur(3px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:100,padding:16}} onClick={()=>setCloseM(null)}>
+        <Card style={{maxWidth:380,width:"100%",boxShadow:"0 8px 30px rgba(0,0,0,.12)"}} onClick={e=>e.stopPropagation()}>
+          <div style={{fontSize:16,fontWeight:700,color:C.blue,marginBottom:12}}>Scale Out — {closeM.name}</div>
+          <div style={{fontSize:12,color:C.t3,marginBottom:14}}>{closeM.quantity.toLocaleString()} units available</div>
+          <Inp label="Quantity to sell" type="number" value={cQ} onChange={e=>setCQ(e.target.value)}/>
+          <Inp label="Exit price per turbo (€)" type="number" step="0.01" value={cP} onChange={e=>setCP(e.target.value)}/>
+          {cQ&&cP&&(()=>{const q=parseInt(cQ)||0,pr=parseFloat(cP)||0,pnl=(pr-closeM.entryPriceTurbo)*q;
+            return <div style={{background:C.bgS,borderRadius:4,padding:12,marginBottom:12,fontFamily:mono,fontSize:13,border:"1px solid "+C.bdrL}}>
+              <div>Proceeds: {fE(pr*q)}</div>
+              <div style={{fontSize:16,fontWeight:700,color:pnl>=0?C.grn:C.red,marginTop:3}}>P&L: {fS(pnl)}</div>
+            </div>;})()}
+          <div style={{display:"flex",gap:8}}><Btn onClick={()=>{const q=parseInt(cQ)||0,pr=parseFloat(cP)||0;if(q<=0||pr<=0||q>closeM.quantity)return;setPos(ps=>ps.map(p=>p.id===closeM.id?{...p,quantity:p.quantity-q}:p));setCloseM(null);setCQ("");setCP("");}}>Confirm</Btn><Btn v="ghost" onClick={()=>setCloseM(null)}>Cancel</Btn></div>
+        </Card>
+      </div>}
+
+      {/* Events preview */}
+      {upcoming.length>0&&<Card>
+        <div style={{fontSize:13,fontWeight:700,color:C.blue,marginBottom:10}}>Upcoming Events</div>
+        {upcoming.slice(0,3).map(ev=>{const d=dTo(ev.date);return <div key={ev.id} style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderBottom:"1px solid "+C.bdrL}}>
+          <span style={{fontSize:13,fontWeight:500}}>{ev.title} <span style={{color:C.t3,fontSize:11}}>{ev.date}</span></span>
+          <span style={{fontSize:11,fontWeight:700,color:d<=2?C.red:d<=7?C.org:C.t3,fontFamily:mono}}>{d===0?"TODAY":d===1?"TMR":d+"d"}</span>
+        </div>;})}
+      </Card>}
+    </>}
+
+    {/* ═══ STRATEGY ═══ */}
+    {tab==="strategy"&&<>
+      <Card>
+        <div style={{fontSize:13,fontWeight:700,color:C.blue,marginBottom:8}}>API Configuration</div>
+        <div style={{display:"flex",gap:8}}>
+          <input type="password" value={apiKey} onChange={e=>saveApi(e.target.value)} placeholder="sk-ant-..." style={{background:C.bgS,border:"1px solid "+C.bdr,borderRadius:4,padding:"8px 11px",color:C.txt,fontFamily:mono,fontSize:12,flex:1,outline:"none"}}/>
+          <Btn onClick={()=>{setStratLoad(true);runStrategy(pos,events,apiKey,(e,r)=>{setStratLoad(false);if(e)show(e);else{setStrat(r);show("Analysis complete");}});}}>{stratLoad?"Analyzing...":"Run Analysis"}</Btn>
+        </div>
+        <div style={{fontSize:11,color:C.t3,marginTop:4}}>Stored in browser. Auto-runs on each screenshot upload.</div>
+      </Card>
+
+      {stratLoad&&<Card style={{textAlign:"center",padding:28}}><div className="anim" style={{color:C.blueA,fontWeight:600}}>Analyzing portfolio and market conditions...</div></Card>}
+
+      {strategy&&!stratLoad&&<>
+        <Card>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+            <div style={{fontSize:15,fontWeight:700,color:C.blue}}>Assessment</div>
+            <span style={{fontSize:11,fontWeight:700,color:strategy.riskLevel==="LOW"?C.grn:strategy.riskLevel==="MODERATE"?C.blueA:strategy.riskLevel==="ELEVATED"?C.org:C.red,textTransform:"uppercase",letterSpacing:".05em"}}>{strategy.riskLevel} risk</span>
+          </div>
+          <div style={{fontSize:13,color:C.t2,lineHeight:1.65}}>{strategy.summary}</div>
+        </Card>
+
+        {/* Position Summaries */}
+        {strategy.positionSummaries&&<Card>
+          <div style={{fontSize:14,fontWeight:700,color:C.blue,marginBottom:10}}>Position Status</div>
+          {strategy.positionSummaries.map((ps,i)=><div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:i<strategy.positionSummaries.length-1?"1px solid "+C.bdrL:"none"}}>
+            <div>
+              <div style={{fontSize:13,fontWeight:600}}>{ps.name}</div>
+              <div style={{fontSize:12,color:C.t2,marginTop:1}}>{ps.status}</div>
+            </div>
+            <span style={{fontSize:10,fontWeight:700,color:ps.priority==="HIGH"?C.red:ps.priority==="MEDIUM"?C.org:C.t3,textTransform:"uppercase"}}>{ps.priority}</span>
+          </div>)}
+        </Card>}
+
+        {/* Actions */}
+        {strategy.actions?.length>0&&<Card>
+          <div style={{fontSize:14,fontWeight:700,color:C.blue,marginBottom:12}}>Recommended Actions</div>
+          {strategy.actions.map((a,i)=>{
+            const urg={IMMEDIATE:C.red,THIS_WEEK:C.org,MONITOR:C.blueA};
+            return <div key={i} style={{border:"1px solid "+(a.urgency==="IMMEDIATE"?C.red+"40":a.urgency==="THIS_WEEK"?C.org+"30":C.bdr),borderRadius:4,padding:14,marginBottom:8,background:a.urgency==="IMMEDIATE"?C.redBg:a.urgency==="THIS_WEEK"?C.orgBg:C.bgS}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+                <span style={{fontSize:13,fontWeight:700,color:C.txt}}>{a.type.replace(/_/g," ")}</span>
+                <span style={{fontSize:10,fontWeight:700,color:urg[a.urgency]||C.t3,textTransform:"uppercase"}}>{a.urgency.replace(/_/g," ")}</span>
+              </div>
+              <div style={{fontSize:12,color:C.t3,marginBottom:6}}>{a.position}</div>
+              {/* Specific numbers */}
+              <div style={{display:"flex",gap:12,flexWrap:"wrap",marginBottom:8}}>
+                {a.turboPrice!=null&&<div style={{background:C.w,borderRadius:4,padding:"4px 10px",border:"1px solid "+C.bdrL,fontSize:12,fontFamily:mono}}>Price: <b>€{a.turboPrice}</b></div>}
+                {a.quantity!=null&&<div style={{background:C.w,borderRadius:4,padding:"4px 10px",border:"1px solid "+C.bdrL,fontSize:12,fontFamily:mono}}>Qty: <b>{a.quantity}</b></div>}
+                {a.profitOrLoss!=null&&<div style={{background:C.w,borderRadius:4,padding:"4px 10px",border:"1px solid "+C.bdrL,fontSize:12,fontFamily:mono,color:a.profitOrLoss>=0?C.grn:C.red}}>P&L: <b>{fS(a.profitOrLoss)}</b></div>}
+              </div>
+              <div style={{fontSize:12,color:C.t2,lineHeight:1.6}}>{a.reasoning}</div>
+            </div>;
+          })}
+        </Card>}
+
+        {/* Risks & Outlook */}
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+          {strategy.keyRisks&&<Card>
+            <div style={{fontSize:13,fontWeight:700,color:C.blue,marginBottom:8}}>Key Risks</div>
+            {strategy.keyRisks.map((r,i)=><div key={i} style={{fontSize:12,color:C.t2,lineHeight:1.5,padding:"6px 0",borderBottom:i<strategy.keyRisks.length-1?"1px solid "+C.bdrL:"none"}}>{r}</div>)}
+          </Card>}
+          {strategy.outlook&&<Card>
+            <div style={{fontSize:13,fontWeight:700,color:C.blue,marginBottom:8}}>Outlook</div>
+            <div style={{fontSize:12,color:C.t2,lineHeight:1.6}}>{strategy.outlook}</div>
+          </Card>}
+        </div>
+      </>}
+
+      {!strategy&&!stratLoad&&<Card style={{textAlign:"center",padding:30}}>
+        <div style={{fontSize:15,fontWeight:600,color:C.blue,marginBottom:6}}>No analysis available</div>
+        <div style={{fontSize:13,color:C.t3,maxWidth:360,margin:"0 auto",lineHeight:1.5}}>Upload a DEGIRO screenshot or click "Run Analysis" to generate strategy recommendations.</div>
+      </Card>}
+    </>}
+
+    {/* ═══ CHARTS ═══ */}
+    {tab==="charts"&&<>
+      <div style={{display:"flex",gap:1,marginBottom:14,borderBottom:"1px solid "+C.bdr}}>
+        {[{k:"pnl",l:"P&L"},{k:"value",l:"Value"},{k:"buffer",l:"Buffer"}].map(c=><button key={c.k} onClick={()=>setChartV(c.k)} style={{background:"none",border:"none",borderBottom:chartV===c.k?"2px solid "+C.blueA:"2px solid transparent",color:chartV===c.k?C.blueA:C.t3,padding:"10px 18px",fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>{c.l}</button>)}
+      </div>
+      {snaps.length<2?<Card style={{textAlign:"center",padding:28}}><div style={{fontSize:14,fontWeight:600,color:C.blue}}>Insufficient data</div><div style={{fontSize:12,color:C.t3,marginTop:4}}>Upload screenshots on different days to build chart history.</div></Card>:<>
+        {chartV==="pnl"&&<Card><div style={{fontSize:14,fontWeight:700,color:C.blue,marginBottom:3}}>P&L History</div><div style={{fontSize:11,color:C.t3,marginBottom:14}}>Unrealized and daily P&L over time</div><Chart data={pnlD} keys={["Unrealized","Daily"]} colors={[C.blueA,"#7C3AED"]} zero unit="€"/></Card>}
+        {chartV==="value"&&<Card><div style={{fontSize:14,fontWeight:700,color:C.blue,marginBottom:3}}>Portfolio Value</div><div style={{fontSize:11,color:C.t3,marginBottom:14}}>Total mark-to-market</div><Chart data={pnlD} keys={["Value"]} colors={[C.grn]} unit="€"/></Card>}
+        {chartV==="buffer"&&<Card><div style={{fontSize:14,fontWeight:700,color:C.blue,marginBottom:3}}>Buffer History</div><div style={{fontSize:11,color:C.t3,marginBottom:14}}>Distance to knock-out per position</div><Chart data={bfD} keys={bfN} colors={[C.blueA,"#7C3AED"]} unit="%" refs={[{y:8,c:C.red,l:"8%"},{y:15,c:C.org,l:"15%"},{y:25,c:C.grn,l:"25%"}]}/></Card>}
+      </>}
+    </>}
+
+    {/* ═══ EVENTS ═══ */}
+    {tab==="events"&&<>
+      <Card>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+          <div style={{fontSize:15,fontWeight:700,color:C.blue}}>Event Calendar</div>
+          <div style={{display:"flex",gap:6}}>
+            <Btn v="sec" onClick={()=>{if(!apiKey)return show("Set API key in Strategy tab");show("Refreshing events...");
+              fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json","x-api-key":apiKey,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
+                body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:2000,
+                  messages:[{role:"user",content:`Update the historical data for these financial events. For each, provide the last known figure/decision and its market impact. Today is ${tod()}.
+
+Events: ${JSON.stringify(events.map(e=>({id:e.id,title:e.title,date:e.date,type:e.type})))}
+
+JSON only, no markdown: [{"id":"...","lastFigure":"...","marketImpact":"..."}]`}]})
+              }).then(r=>r.json()).then(d=>{
+                if(d.error)return show(d.error.message);
+                const updates=JSON.parse(d.content.map(c=>c.text||"").join("").replace(/```json|```/g,"").trim());
+                setEvents(es=>es.map(ev=>{const u=updates.find(x=>x.id===ev.id);return u?{...ev,lastFigure:u.lastFigure,marketImpact:u.marketImpact}:ev;}));
+                show("Events updated");
+              }).catch(e=>show(e.message));
+            }}>Refresh Data</Btn>
+            <Btn onClick={()=>setShowAddEv(true)}>Add Event</Btn>
+          </div>
+        </div>
+        {[...events].sort((a,b)=>new Date(a.date)-new Date(b.date)).map(ev=>{
+          const d=dTo(ev.date),past=d<0;
+          return <div key={ev.id} style={{padding:"14px 0",borderBottom:"1px solid "+C.bdrL,opacity:past?.35:1}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:ev.lastFigure?6:0}}>
+              <div>
+                <div style={{fontSize:14,fontWeight:600}}>{ev.title}</div>
+                <div style={{fontSize:11,color:C.t3}}>{ev.date} — {ev.type} — {ev.impact} impact</div>
+              </div>
+              <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                <span style={{fontSize:11,fontWeight:700,color:past?C.t3:d<=2?C.red:d<=7?C.org:C.t3,fontFamily:mono}}>{past?"PAST":d===0?"TODAY":d===1?"TMR":d+"d"}</span>
+                <button onClick={()=>setEvents(es=>es.filter(x=>x.id!==ev.id))} style={{background:"none",border:"none",color:C.t4,cursor:"pointer",fontSize:14}}>×</button>
+              </div>
+            </div>
+            {ev.lastFigure&&<div style={{background:C.bgS,borderRadius:4,padding:"8px 12px",marginTop:6,border:"1px solid "+C.bdrL}}>
+              <div style={{fontSize:12,color:C.txt,lineHeight:1.5}}><span style={{fontWeight:600}}>Last:</span> {ev.lastFigure}</div>
+              {ev.marketImpact&&<div style={{fontSize:11,color:C.t2,lineHeight:1.5,marginTop:3}}><span style={{fontWeight:600}}>Impact:</span> {ev.marketImpact}</div>}
+            </div>}
+          </div>;
+        })}
+      </Card>
+      {showAddEv&&<div style={{position:"fixed",inset:0,background:"rgba(26,26,46,.4)",backdropFilter:"blur(3px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:100,padding:16}} onClick={()=>setShowAddEv(false)}>
+        <Card style={{maxWidth:380,width:"100%",boxShadow:"0 8px 30px rgba(0,0,0,.12)"}} onClick={e=>e.stopPropagation()}>
+          <EvForm onSave={ev=>{setEvents(es=>[...es,{...ev,id:"e_"+Date.now()}]);setShowAddEv(false);}} onCancel={()=>setShowAddEv(false)}/>
+        </Card>
+      </div>}
+    </>}
+
+    <div style={{textAlign:"center",padding:"20px 0 10px",fontSize:10,color:C.t4}}>Data stored in browser. Always verify with DEGIRO.</div>
+    </div>
+  </div>;
+}
+
+function EvForm({onSave,onCancel}){
+  const [f,setF]=useState({title:"",date:"",type:"macro",impact:"high",lastFigure:"",marketImpact:""});
+  return <><div style={{fontSize:16,fontWeight:700,color:C.blue,marginBottom:12}}>New Event</div>
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+      <Inp label="Name" value={f.title} onChange={e=>setF(p=>({...p,title:e.target.value}))}/><Inp label="Date" type="date" value={f.date} onChange={e=>setF(p=>({...p,date:e.target.value}))}/>
+      <Sel label="Type" value={f.type} onChange={e=>setF(p=>({...p,type:e.target.value}))}><option value="macro">Macro</option><option value="earnings">Earnings</option><option value="other">Other</option></Sel>
+      <Sel label="Impact" value={f.impact} onChange={e=>setF(p=>({...p,impact:e.target.value}))}><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></Sel>
+    </div>
+    <Inp label="Last figure / decision (optional)" value={f.lastFigure} onChange={e=>setF(p=>({...p,lastFigure:e.target.value}))}/>
+    <Inp label="Market impact (optional)" value={f.marketImpact} onChange={e=>setF(p=>({...p,marketImpact:e.target.value}))}/>
+    <div style={{display:"flex",gap:8,marginTop:4}}><Btn onClick={()=>{if(f.title&&f.date)onSave(f);}}>Save</Btn><Btn v="ghost" onClick={onCancel}>Cancel</Btn></div></>;
+}
+
+ReactDOM.render(<App/>,document.getElementById("root"));
+</script>
+</body>
+</html>
