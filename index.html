@@ -233,7 +233,7 @@ Return ONLY valid JSON, no markdown:
         <button onClick={onClose} style={{color:T.txt3,fontSize:24,padding:4}}>×</button>
       </div>
       {st!=="done"&&<div style={{borderColor:drag?T.blueA:T.txt4,background:drag?T.blueT:T.inputBg,color:T.txt2}} className="drop" onDragOver={e=>{e.preventDefault();setDrag(true);}} onDragLeave={()=>setDrag(false)} onDrop={e=>{e.preventDefault();setDrag(false);go(e.dataTransfer.files[0]);}} onClick={()=>ref.current?.click()}>
-        <input ref={ref} type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={e=>go(e.target.files[0])}/>
+        <input ref={ref} type="file" accept="image/*" style={{display:"none"}} onChange={e=>go(e.target.files[0])}/>
         {st==="idle"&&<><div style={{fontSize:14,fontWeight:600,color:T.txt}}>Drop screenshot or tap to select</div><div style={{fontSize:12,color:T.txt3,marginTop:3}}>Camera available on mobile</div></>}
         {st==="loading"&&<div style={{color:T.blueA}}>Reading...</div>}
         {st==="analyzing"&&<div className="anim" style={{color:T.blueA,fontWeight:600}}>Analyzing portfolio data...</div>}
