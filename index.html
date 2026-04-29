@@ -2,150 +2,151 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>Turbo Dashboard — DEGIRO Portfolio Tracker</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#0A2463">
+<title>Turbo Dashboard</title>
 <script crossorigin src="https://unpkg.com/react@17/umd/react.production.min.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@17/umd/react-dom.production.min.js"></script>
 <script crossorigin src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
-*{margin:0;padding:0;box-sizing:border-box;}
-body{font-family:'Source Sans 3',-apple-system,BlinkMacSystemFont,system-ui,sans-serif;background:#fff;color:#1a1a2e;-webkit-font-smoothing:antialiased;font-size:14px;}
-input,select,button{font-family:inherit;}
-input:focus,select:focus{outline:none;border-color:#0066cc !important;}
-::-webkit-scrollbar{width:4px;}::-webkit-scrollbar-thumb{background:#ccc;border-radius:2px;}
-.drop{border:1.5px dashed #99c2e8;border-radius:8px;padding:36px 20px;text-align:center;cursor:pointer;transition:all 0.15s;background:#f7fafd;}
-.drop:hover,.drop.ov{border-color:#0066cc;background:#eef5fc;}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html,body{overscroll-behavior-y:none;}
+body{font-family:'Source Sans 3',-apple-system,BlinkMacSystemFont,system-ui,sans-serif;-webkit-font-smoothing:antialiased;font-size:14px;transition:background 0.2s,color 0.2s;}
+input,select,button,textarea{font-family:inherit;}
+input:focus,select:focus,textarea:focus{outline:none;}
+.scroll::-webkit-scrollbar{width:3px;height:3px;}.scroll::-webkit-scrollbar-thumb{background:#aaa;border-radius:2px;}
+.drop{border:1.5px dashed currentColor;border-radius:10px;padding:32px 18px;text-align:center;cursor:pointer;transition:all .15s;}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
-@keyframes fadeIn{from{opacity:0;transform:translateX(-50%) translateY(-6px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
-.anim{animation:pulse 1.5s ease-in-out infinite;}
-.tip{position:relative;cursor:help;border-bottom:1px dotted #aab;}
-.tip .tiptext{visibility:hidden;opacity:0;position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);background:#1a1a2e;color:#fff;padding:8px 12px;border-radius:6px;font-size:11px;line-height:1.4;white-space:pre-line;min-width:220px;max-width:320px;z-index:50;box-shadow:0 4px 12px rgba(0,0,0,.15);pointer-events:none;transition:opacity .15s;}
-.tip .tiptext::after{content:"";position:absolute;top:100%;left:50%;transform:translateX(-50%);border:5px solid transparent;border-top-color:#1a1a2e;}
-.tip:hover .tiptext{visibility:visible;opacity:1;}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes slideIn{from{transform:translateX(100%)}to{transform:translateX(0)}}
+@keyframes slideUp{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}
+.anim{animation:pulse 1.4s ease-in-out infinite;}
+.fadeIn{animation:fadeIn .25s ease;}
+.slideIn{animation:slideIn .3s cubic-bezier(.4,0,.2,1);}
+.slideUp{animation:slideUp .3s cubic-bezier(.4,0,.2,1);}
+.tip{position:relative;}
+.tip:hover .tt{visibility:visible;opacity:1;}
+.tt{visibility:hidden;opacity:0;position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);background:#1a1a2e;color:#fff;padding:8px 12px;border-radius:6px;font-size:11px;line-height:1.4;white-space:pre-line;min-width:220px;max-width:300px;z-index:50;box-shadow:0 4px 12px rgba(0,0,0,.2);pointer-events:none;transition:opacity .15s;}
+.tt::after{content:"";position:absolute;top:100%;left:50%;transform:translateX(-50%);border:5px solid transparent;border-top-color:#1a1a2e;}
+button{cursor:pointer;border:none;background:none;}
+.mono{font-family:'SF Mono','Menlo','Monaco','Consolas',monospace;font-feature-settings:"tnum";}
 </style>
 </head>
 <body>
 <div id="root"></div>
 <script type="text/babel">
-const {useState,useEffect,useCallback,useRef}=React;
+const {useState,useEffect,useCallback,useRef,useMemo}=React;
 
-// ── Amundi palette ──
-const C={blue:"#0A2463",blueM:"#1E3A6E",blueA:"#0066cc",blueL:"#e8f1fa",blueT:"#f5f8fc",grn:"#1a8754",grnBg:"#edf7f1",red:"#c0392b",redBg:"#fdf0ee",org:"#c67700",orgBg:"#fef8ee",txt:"#1a1a2e",t2:"#4a4a5a",t3:"#8a8a9a",t4:"#b0b0be",bdr:"#e0e0ea",bdrL:"#ececf2",bg:"#ffffff",bgS:"#f7f8fa",w:"#ffffff"};
-const mono="'SF Mono','Menlo','Monaco','Consolas',monospace";
+// ── Themes ──
+const TL={n:"light",bg:"#FAFBFC",card:"#FFF",border:"#E5E7EB",borderL:"#F1F3F5",txt:"#0F172A",txt2:"#475569",txt3:"#94A3B8",txt4:"#CBD5E1",blue:"#0A2463",blueA:"#0066CC",blueL:"#E8F1FA",blueT:"#F4F8FC",grn:"#1A8754",grnBg:"#EDF7F1",red:"#C0392B",redBg:"#FDF0EE",org:"#C67700",orgBg:"#FEF8EE",inputBg:"#F8FAFC",inputBdr:"#D1D5DB",headerBg:"#0A2463",headerTxt:"#FFF",sh:"0 1px 3px rgba(0,0,0,.05)",modal:"rgba(15,23,42,.45)"};
+const TD={n:"dark",bg:"#0F1419",card:"#1A1F2E",border:"#2A3344",borderL:"#222A3A",txt:"#F1F5F9",txt2:"#CBD5E1",txt3:"#7B8AA0",txt4:"#475569",blue:"#3B82F6",blueA:"#60A5FA",blueL:"#1E3A6E",blueT:"#1A2540",grn:"#4ADE80",grnBg:"#0F2920",red:"#F87171",redBg:"#2A1212",org:"#FBBF24",orgBg:"#2A1F0A",inputBg:"#0F1419",inputBdr:"#3A4356",headerBg:"#0A1628",headerTxt:"#F1F5F9",sh:"0 1px 3px rgba(0,0,0,.3)",modal:"rgba(0,0,0,.7)"};
 
-// ── Formatting ──
+// ── Format ──
 const fE=v=>"€"+(Math.abs(v)>=1000?v.toLocaleString("fr-FR",{minimumFractionDigits:2,maximumFractionDigits:2}):v.toFixed(2));
 const fS=(v,d=2)=>(v>=0?"+":"")+v.toFixed(d);
 const fP=v=>(v>=0?"+":"")+v.toFixed(2)+"%";
 const fR=v=>v>=10?v.toFixed(2):v>=1?v.toFixed(3):v.toFixed(4);
-
-// ── Defaults ──
-const D_POS=[];  // Start empty — user uploads their DEGIRO screenshot
-const D_EV=[
-  {id:"e1",date:"2026-04-08",title:"ECB Rate Decision",type:"macro",impact:"high",lastFigure:"Deposit rate: 2.50%. Last cut: -25bps (Mar 2026). Markets priced in one more cut by June.",marketImpact:"EUR weakened 0.3% vs USD. European equities rallied +1.2% on dovish guidance."},
-  {id:"e2",date:"2026-04-10",title:"US CPI Release",type:"macro",impact:"high",lastFigure:"Feb 2026: +2.8% YoY headline, +3.1% core. Above expectations (+2.7% / +3.0%).",marketImpact:"10Y yield jumped 8bps to 4.35%. Tech sold off -1.8%. Rate cut expectations pushed back."},
-  {id:"e3",date:"2026-04-24",title:"Thales Q1 Earnings",type:"earnings",impact:"high",lastFigure:"FY2025: Revenue €20.1B (+12%), order intake €24.8B. Guidance raised for FY2026.",marketImpact:"Stock rallied +6.3% on results day. Defense sector followed +2.5%."},
-  {id:"e4",date:"2026-05-07",title:"FOMC Rate Decision",type:"macro",impact:"high",lastFigure:"Fed Funds: 4.25-4.50%. Held steady since Jan 2026. Dot plot signals 2 cuts in 2026.",marketImpact:"S&P 500 +0.8%. Dollar index flat. Powell emphasized data-dependency."},
-  {id:"e5",date:"2026-05-28",title:"NVIDIA Earnings (Q1 FY27)",type:"earnings",impact:"high",lastFigure:"Q4 FY26: Revenue $39.3B (+78% YoY). Data center $32.8B. Guidance Q1: $42B ±2%.",marketImpact:"Stock +8.5% after-hours. Entire semi sector lifted. MU +4.2% sympathy."},
-  {id:"e6",date:"2026-06-18",title:"FOMC Rate Decision",type:"macro",impact:"high",lastFigure:"See May meeting above. Market pricing ~60% probability of first cut at this meeting.",marketImpact:"Key catalyst for H2 direction. Rate-sensitive tech would rally on cut confirmation."},
-  {id:"e7",date:"2026-06-25",title:"Micron Earnings (Q3 FY26)",type:"earnings",impact:"high",lastFigure:"Q2 FY26: Revenue $8.7B (+42% YoY). HBM revenue $1.8B. Gross margin 37.5%.",marketImpact:"Stock +5.1% on beat. HBM demand narrative reinforced. DRAM pricing stable."}
-];
-
-// ── Math ──
-const tP=p=>p.currentPrice<=p.strike?0:(p.currentPrice-p.strike)/p.ratio/p.fxRate;
-const bf=p=>p.currentPrice<=0?0:((p.currentPrice-p.barrier)/p.currentPrice)*100;
-const pV=p=>p.quantity*tP(p);
-const uPL=p=>(tP(p)-p.entryPriceTurbo)*p.quantity;
-const dl=p=>p.quantity*(1/p.ratio)*(1/p.fxRate);
-const bI=b=>{if(b>=25)return{l:"Safe",c:C.grn};if(b>=15)return{l:"Moderate",c:C.blueA};if(b>=8)return{l:"Elevated",c:C.org};return{l:"Danger",c:C.red};};
-const dTo=d=>{const n=new Date();n.setHours(0,0,0,0);return Math.ceil((new Date(d)-n)/86400000);};
 const tod=()=>new Date().toISOString().slice(0,10);
+const ts=()=>{const n=new Date();return(n.getMonth()+1).toString().padStart(2,"0")+"-"+n.getDate().toString().padStart(2,"0")+" "+n.getHours().toString().padStart(2,"0")+":"+n.getMinutes().toString().padStart(2,"0");};
+const dTo=d=>{const n=new Date();n.setHours(0,0,0,0);return Math.ceil((new Date(d)-n)/86400000);};
 const ld=(k,d)=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch{return d;}};
 const sv=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch{}};
 
-// ── Tooltip metric ──
-function Metric({label,value,sub,color,formula}){
-  const inner=<div style={{padding:"10px 12px",background:C.bgS,borderRadius:6,border:"1px solid "+C.bdrL}}>
-    <div style={{fontSize:10,fontWeight:600,color:C.t3,textTransform:"uppercase",letterSpacing:".06em",marginBottom:3}}>{label}</div>
-    <div style={{fontSize:15,fontWeight:700,color:color||C.txt,fontFamily:mono,letterSpacing:"-.01em"}}>{value}</div>
-    {sub&&<div style={{fontSize:10,color:color||C.t3,fontFamily:mono,marginTop:1}}>{sub}</div>}
-  </div>;
-  if(!formula)return inner;
-  return <div className="tip">{inner}<div className="tiptext">{formula}</div></div>;
-}
+// ── Math (prefer DEGIRO values when available) ──
+const tP=p=>p.cours&&p.cours>0?p.cours:(p.currentPrice<=p.strike?0:(p.currentPrice-p.strike)/p.ratio/p.fxRate);
+const bf=p=>p.currentPrice<=0?0:((p.currentPrice-p.barrier)/p.currentPrice)*100;
+const pV=p=>p.valeur&&p.valeur>0?p.valeur:p.quantity*tP(p); // Trust DEGIRO valeur
+const uPL=p=>p.totalUnrealizedEur!=null?p.totalUnrealizedEur:(p.entryPriceTurbo>0?(tP(p)-p.entryPriceTurbo)*p.quantity:0);
+const dl=p=>p.quantity*(1/p.ratio)*(1/p.fxRate);
+const bI=(b,T)=>{if(b>=25)return{l:"Safe",c:T.grn};if(b>=15)return{l:"Moderate",c:T.blueA};if(b>=8)return{l:"Elevated",c:T.org};return{l:"Danger",c:T.red};};
 
-// ── SVG Chart ──
-function Chart({data,keys,colors,w:cw=700,h:ch=200,zero=false,unit="€",refs=[]}){
-  if(!data||data.length<2)return <div style={{textAlign:"center",padding:28,color:C.t3,fontSize:13}}>Minimum 2 data points required</div>;
-  const P={t:14,r:52,b:24,l:48};const W=cw-P.l-P.r;const H=ch-P.t-P.b;
-  let av=[];keys.forEach(k=>data.forEach(d=>{if(d[k]!=null)av.push(d[k]);}));refs.forEach(r=>av.push(r.y));if(zero)av.push(0);
-  let mn=Math.min(...av),mx=Math.max(...av);if(mn===mx){mn-=10;mx+=10;}const rng=mx-mn;mn-=rng*.05;mx+=rng*.05;
-  const sx=i=>P.l+(i/(data.length-1))*W;const sy=v=>P.t+(1-(v-mn)/(mx-mn))*H;
-  const yt=[];for(let i=0;i<=4;i++)yt.push(mn+((mx-mn)/4)*i);
-  return <svg width="100%" viewBox={`0 0 ${cw} ${ch}`} style={{display:"block"}}>
-    {yt.map((v,i)=><g key={i}><line x1={P.l} y1={sy(v)} x2={cw-P.r} y2={sy(v)} stroke={C.bdrL} strokeWidth=".5"/><text x={P.l-5} y={sy(v)+3} textAnchor="end" fontSize="9" fill={C.t3} fontFamily={mono}>{unit==="€"?"€"+v.toFixed(0):v.toFixed(0)+"%"}</text></g>)}
-    {data.map((d,i)=>{if(data.length<=8||i%(Math.floor(data.length/5))===0||i===data.length-1)return <text key={i} x={sx(i)} y={ch-4} textAnchor="middle" fontSize="9" fill={C.t3} fontFamily={mono}>{d.date}</text>;return null;})}
-    {refs.map((r,i)=><g key={"r"+i}><line x1={P.l} y1={sy(r.y)} x2={cw-P.r} y2={sy(r.y)} stroke={r.c} strokeDasharray="4,3" strokeWidth=".7"/><text x={cw-P.r+3} y={sy(r.y)+3} fontSize="8" fill={r.c} fontFamily={mono}>{r.l}</text></g>)}
-    {zero&&<line x1={P.l} y1={sy(0)} x2={cw-P.r} y2={sy(0)} stroke={C.t4} strokeDasharray="3,3" strokeWidth=".5"/>}
-    {keys.map((k,ki)=>{const pts=data.map((d,i)=>d[k]!=null?{x:sx(i),y:sy(d[k])}:null).filter(Boolean);if(pts.length<2)return null;const path=pts.map((p,i)=>(i===0?"M":"L")+p.x+","+p.y).join(" ");const fill=path+"L"+pts[pts.length-1].x+","+sy(mn)+"L"+pts[0].x+","+sy(mn)+"Z";const c=colors[ki%colors.length];
-      return <g key={k}><path d={fill} fill={c} fillOpacity=".05"/><path d={path} fill="none" stroke={c} strokeWidth="1.5"/>{pts.map((p,i)=><circle key={i} cx={p.x} cy={p.y} r="2.5" fill={C.w} stroke={c} strokeWidth="1.5"/>)}</g>;})}
-    {keys.length>1&&keys.map((k,i)=><g key={"lg"+i} transform={`translate(${P.l+i*130},${ch})`}><line x1="0" y1="-2" x2="12" y2="-2" stroke={colors[i%colors.length]} strokeWidth="2"/><text x="16" y="0" fontSize="9" fill={C.t2}>{k}</text></g>)}
-  </svg>;
-}
+// ── Trading Rules ──
+const RULES={
+  maxPosWeight:60, // % of portfolio for any single position (warn)
+  maxPosWeightHard:80, // hard block
+  minBuffer:15, // % minimum buffer on entry (warn)
+  minBufferHard:8, // hard block
+  maxLeverage:5, // x maximum leverage (warn)
+  maxLeverageHard:10, // hard block
+  scaleOutThreshold:100, // % unrealized gain triggers scale-out warning
+  reduceBeforeEvent:7, // days before high-impact event to suggest reducing
+};
 
-// ── UI ──
-const Card=({children,style,...p})=><div style={{background:C.bg,borderRadius:4,border:"1px solid "+C.bdr,padding:"20px 22px",marginBottom:12,...style}} {...p}>{children}</div>;
-const Lbl=({children,style})=><div style={{fontSize:10,fontWeight:600,color:C.t3,textTransform:"uppercase",letterSpacing:".07em",marginBottom:3,...style}}>{children}</div>;
-function Btn({children,v="primary",style,...props}){
-  const s={primary:{background:C.blueA,color:C.w,padding:"8px 18px"},sec:{background:C.blueL,color:C.blueA,padding:"7px 14px"},ghost:{background:"transparent",color:C.t2,padding:"7px 10px"},danger:{background:C.redBg,color:C.red,padding:"7px 14px"}};
-  return <button style={{border:"none",borderRadius:4,fontWeight:600,fontSize:13,cursor:"pointer",fontFamily:"inherit",display:"inline-flex",alignItems:"center",gap:5,...s[v],...style}} {...props}>{children}</button>;
-}
-const Inp=({label,...p})=><div style={{marginBottom:9}}>{label&&<Lbl>{label}</Lbl>}<input style={{background:C.bgS,border:"1px solid "+C.bdr,borderRadius:4,padding:"8px 11px",color:C.txt,fontFamily:mono,fontSize:13,width:"100%",outline:"none",boxSizing:"border-box"}} {...p}/></div>;
-const Sel=({label,children,...p})=><div style={{marginBottom:9}}>{label&&<Lbl>{label}</Lbl>}<select style={{background:C.bgS,border:"1px solid "+C.bdr,borderRadius:4,padding:"8px 11px",color:C.txt,fontFamily:mono,fontSize:13,width:"100%",outline:"none",boxSizing:"border-box"}} {...p}>{children}</select></div>;
-const Divider=()=><div style={{height:1,background:C.bdr,margin:"16px 0"}}/>;
+// ── Stock Ideas ──
+const D_IDEAS=[
+  {ticker:"ASML",name:"ASML Holding",exchange:"AEX",sector:"Semiconductor Equipment",thesis:"EUV monopoly, AI capex tailwind, €38.8B order backlog",turboType:"Long",suggestedLev:"3-4x"},
+  {ticker:"BNP",name:"BNP Paribas",exchange:"Euronext Paris",sector:"Financials",thesis:"ECB rate hikes priced in, 8x P/E, Citi top pick",turboType:"Long",suggestedLev:"3-4x"},
+  {ticker:"RHM",name:"Rheinmetall",exchange:"XETRA",sector:"Defense",thesis:"NATO spending, €1B Bundeswehr contract, 50% upside to target",turboType:"Long",suggestedLev:"2-3x"},
+  {ticker:"GOLD",name:"Gold Spot",exchange:"COMEX",sector:"Commodities",thesis:"Geopolitical hedge, central bank buying, uncorrelated to tech",turboType:"Long",suggestedLev:"2-3x"}
+];
 
-// ══════════ SCREENSHOT ══════════
-function Screenshotter({positions,apiKey,onUpdate,onClose}){
+const D_EV=[
+  {id:"e1",date:"2026-04-30",title:"ECB Rate Decision",type:"macro",impact:"high",lastFigure:"Deposit rate held at 2.00%. ECB signaled possible rate hikes ahead per Citi.",marketImpact:"EUR strengthened, European banks rallied. BNP +2% on hike expectations.",expectations:"Markets price 60% probability of 25bps hike. Watch Lagarde's tone on inflation."},
+  {id:"e2",date:"2026-05-07",title:"FOMC Rate Decision",type:"macro",impact:"high",lastFigure:"Fed Funds: 4.25-4.50%. Held since Jan 2026. Dot plot signals 2 cuts in 2026.",marketImpact:"S&P 500 +0.8% on hold. Dollar flat. Powell emphasized data-dependency.",expectations:"Hold expected. Watch dot plot and Powell's view on tariff-driven inflation."},
+  {id:"e3",date:"2026-05-07",title:"Rheinmetall Q1 Earnings",type:"earnings",impact:"high",lastFigure:"Q4 2025: Revenue €2.42B (miss vs €4.55B est). EPS €14.06 (-25% vs est).",marketImpact:"Stock fell 11% from peak after miss. Defense sector under pressure.",expectations:"Q1 est: EPS €2.90, Revenue €2.24B. Watch order book and Bundeswehr contracts."},
+  {id:"e4",date:"2026-05-13",title:"US CPI Release",type:"macro",impact:"high",lastFigure:"April CPI: +2.9% YoY headline, +3.0% core. In-line with consensus.",marketImpact:"Yields steady, equities mixed. Rate cut expectations unchanged.",expectations:"Consensus: +2.8% YoY headline. Above 3% would push back rate cuts."},
+  {id:"e5",date:"2026-05-20",title:"NVIDIA Earnings (Q1 FY27)",type:"earnings",impact:"high",lastFigure:"Q4 FY26: Revenue $68.1B (+73% YoY). DC $62.3B. Guided $78B Q1.",marketImpact:"Stock +8.5% after-hours. Entire semi sector lifted. MU +4.2% sympathy.",expectations:"Consensus: $78B revenue, EPS $1.74. Watch Rubin ramp commentary, China sales."},
+  {id:"e6",date:"2026-06-18",title:"FOMC Rate Decision",type:"macro",impact:"high",lastFigure:"See May meeting. Market pricing ~60% probability of first cut at this meeting.",marketImpact:"Key catalyst for H2 direction. Tech would rally on cut confirmation.",expectations:"Watch unemployment data, consumer spending. Rate cut path defines H2."},
+  {id:"e7",date:"2026-06-25",title:"Micron Earnings (Q3 FY26)",type:"earnings",impact:"high",lastFigure:"Q2 FY26: Revenue $8.7B (+42% YoY). HBM $1.8B. GM 37.5%. Beat est.",marketImpact:"Stock +5.1% on beat. HBM demand reinforced. DRAM pricing stable.",expectations:"Consensus: Revenue $9.3B, EPS $2.85. HBM ramp and pricing key metrics."}
+];
+
+// ── UI Components ──
+const useTheme=()=>{
+  const [mode,setMode]=useState(()=>localStorage.getItem("td-theme")||"light");
+  const T=mode==="dark"?TD:TL;
+  useEffect(()=>{localStorage.setItem("td-theme",mode);document.body.style.background=T.bg;document.body.style.color=T.txt;},[mode,T]);
+  return [T,mode,setMode];
+};
+
+// ══════════ SCREENSHOT ANALYZER ══════════
+function Screenshotter({T,positions,apiKey,onUpdate,onClose}){
   const [st,setSt]=useState("idle");const [prev,setPrev]=useState(null);const [res,setRes]=useState(null);const [err,setErr]=useState("");const [drag,setDrag]=useState(false);const ref=useRef();
   const go=async file=>{
     if(!file?.type.startsWith("image/"))return;setSt("loading");setErr("");setRes(null);
     const rdr=new FileReader();
     rdr.onload=async e=>{
       const b64=e.target.result;setPrev(b64);
-      if(!apiKey){setErr("Set API key in Strategy tab.");setSt("error");return;}
+      if(!apiKey){setErr("Set API key in Settings first.");setSt("error");return;}
       setSt("analyzing");
       try{
         const r=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",
           headers:{"Content-Type":"application/json","x-api-key":apiKey,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
-          body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1500,
+          body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:2000,
             messages:[{role:"user",content:[
               {type:"image",source:{type:"base64",media_type:file.type,data:b64.split(",")[1]}},
-              {type:"text",text:`Analyze this DEGIRO portfolio screenshot (French). Extract precisely:
+              {type:"text",text:`Analyze this DEGIRO portfolio screenshot (French interface). It can be MOBILE or DESKTOP layout.
 
-Per position:
-- name: full product name
-- cours: COURS column (current turbo price, e.g. 1.03)
-- quantity: QTÉ (French: "1.059"=1059)
-- valeur: VALEUR column
-- pru: PRU column (entry price, e.g. 0.614461)
-- plEur: P/L € column (daily, e.g. +148.26)
-- plPct: P/L % column (daily, e.g. +15.73)
-- plLatentEur: P/L LATENT € (unrealized total)
-- plLatentPct: P/L LATENT %
-- barrier: number after "BAR" in product name
+ACCOUNT HEADER (extract these account-level values):
+- totalCompte: "Total Compte" value
+- totalPortefeuille: "Portefeuille" value
+- espaceLibre: "Espace libre" or "EUR" value (cash available)
+- dailyPnlEur: "P/L Journalière" amount in EUR (the daily P&L)
+- dailyPnlPct: "P/L Journalière" percentage
+- plCumulee: "P/L Cumulée" amount in EUR if shown (total P&L since inception)
+
+PER POSITION:
+- name: full product name (e.g. "BNP MICRON TECHNOLOGY Turbo Call Infini SL 431.98 STR 401.84 R 10 LV 4.41")
+- valeur: the position's TOTAL VALUE in EUR (the big number, e.g. €1.837,32 or €918,08)
+- quantity: QTÉ - number of units (e.g. 183, 304). On mobile may show as "× 183" or "× 304" near the price
+- pruOrCours: the unit price shown (mobile shows just one price like "€10,04 × 183", desktop shows COURS column). Could be PRU or current cours.
+- dailyPlEur: the position's DAILY P/L in EUR (e.g. +353,41 or -3,54). On mobile this is in the right column under +/- Journalière. On desktop it's the P/L € column.
+- dailyPlPct: the position's DAILY P/L percentage (e.g. +14,48% or +3,42%)
+- plLatentEur: TOTAL UNREALIZED P/L in EUR (column "P/L LATENT €"). DESKTOP ONLY - leave null if mobile screenshot.
+- plLatentPct: TOTAL UNREALIZED P/L percentage. DESKTOP ONLY - null if mobile.
+- barrier: number after "BAR" or "SL" in product name
 - strike: number after "STR" in product name
-- ratio: integer after "R " in product name (e.g. 50)
-- leverage: number after "LV" in product name (e.g. 5.65) — EXACT from name, not calculated
+- ratio: integer after "R " in product name
+- leverage: number after "LV" in product name (EXACT, not calculated)
 
-Header:
-- totalCompte: Total Compte
-- totalPortefeuille: Portefeuille
-- dailyPnlEur: P/L Journalière €
-- dailyPnlPct: P/L Journalière %
+CRITICAL RULES:
+- Extract NUMBERS exactly as shown. French uses comma as decimal: "1.837,32" means 1837.32
+- For mobile screenshots, you'll see fewer columns. Just extract what's visible.
+- "valeur" is REQUIRED - it's always shown
+- If a value isn't shown, return null - DO NOT guess
 
-JSON only. No markdown/backticks.
-{"positions":[{...}],"totalCompte":0,"totalPortefeuille":0,"dailyPnlEur":0,"dailyPnlPct":0}`}
+Return ONLY valid JSON, no markdown:
+{"positions":[{...}],"totalCompte":0,"totalPortefeuille":0,"espaceLibre":0,"dailyPnlEur":0,"dailyPnlPct":0,"plCumulee":null,"isMobileLayout":true_or_false}`}
             ]}]})});
         const d=await r.json();if(d.error){setErr(d.error.message);setSt("error");return;}
         setRes(JSON.parse(d.content.map(c=>c.text||"").join("").replace(/```json|```/g,"").trim()));setSt("done");
@@ -155,467 +156,828 @@ JSON only. No markdown/backticks.
   const apply=()=>{
     if(!res)return;const ups=[];const newPos=[];
     (res.positions||[]).forEach((rp,idx)=>{
-      const m=positions.find(p=>{if(rp.barrier&&Math.abs(p.barrier-rp.barrier)<1)return true;const rl=(rp.name||"").toLowerCase(),pl=(p.name+" "+p.underlying).toLowerCase();for(const kw of["micron","thales","nvidia","boeing","airbus","dassault","amazon","microsoft","alphabet"])if(rl.includes(kw)&&pl.includes(kw))return true;return false;});
-      const qty=typeof rp.quantity==="number"?rp.quantity:parseInt(String(rp.quantity).replace(/\./g,""));
-      const ratio=rp.ratio||50;const bar=rp.barrier||0;const cours=rp.cours||0;
-      // Detect underlying name from product name
+      const m=positions.find(p=>{if(rp.barrier&&Math.abs(p.barrier-rp.barrier)<1)return true;const rl=(rp.name||"").toLowerCase(),pl=(p.name+" "+p.underlying).toLowerCase();for(const kw of["micron","thales","nvidia","boeing","airbus","dassault","amazon","microsoft","alphabet","asml","bnp","rheinmetall","gold"])if(rl.includes(kw)&&pl.includes(kw))return true;return false;});
+      const qty=typeof rp.quantity==="number"?rp.quantity:parseInt(String(rp.quantity||"0").replace(/[\.\s]/g,""));
+      const ratio=rp.ratio||(m?m.ratio:50);
+      const bar=rp.barrier||(m?m.barrier:0);
+      const cours=rp.pruOrCours||rp.cours||rp.pru||0;
       const nameL=(rp.name||"").toLowerCase();
-      const detect=n=>{for(const[kw,info]of[["micron",{u:"Micron (MU)",c:"USD",fx:1.08}],["thales",{u:"Thales (HO.PA)",c:"EUR",fx:1}],["nvidia",{u:"NVIDIA (NVDA)",c:"USD",fx:1.08}],["alphabet",{u:"Alphabet (GOOGL)",c:"USD",fx:1.08}],["amazon",{u:"Amazon (AMZN)",c:"USD",fx:1.08}],["microsoft",{u:"Microsoft (MSFT)",c:"USD",fx:1.08}],["airbus",{u:"Airbus (AIR.PA)",c:"EUR",fx:1}],["boeing",{u:"Boeing (BA)",c:"USD",fx:1.08}],["dassault",{u:"Dassault Aviation (AM.PA)",c:"EUR",fx:1}]])if(n.includes(kw))return info;return{u:"Unknown",c:"EUR",fx:1};};
+      const detect=n=>{for(const[kw,info]of[["micron",{u:"Micron Technology",t:"MU",c:"USD",fx:1.08}],["thales",{u:"Thales",t:"HO.PA",c:"EUR",fx:1}],["nvidia",{u:"NVIDIA",t:"NVDA",c:"USD",fx:1.08}],["asml",{u:"ASML Holding",t:"ASML",c:"EUR",fx:1}],["bnp",{u:"BNP Paribas",t:"BNP.PA",c:"EUR",fx:1}],["rheinmetall",{u:"Rheinmetall",t:"RHM.DE",c:"EUR",fx:1}],["gold",{u:"Gold",t:"GC=F",c:"USD",fx:1.08}],["airbus",{u:"Airbus",t:"AIR.PA",c:"EUR",fx:1}],["dassault",{u:"Dassault Aviation",t:"AM.PA",c:"EUR",fx:1}]])if(n.includes(kw))return info;return{u:"Unknown",t:"?",c:"EUR",fx:1};};
+
+      // Compute underlying price - try multiple methods
+      const detectedInfo=detect(nameL);
+      const curr=m?.currency||detectedInfo.c;
+      const fxR=m?.fxRate||detectedInfo.fx;
+      let underlyingPrice=0;
+      // Method 1: from cours × ratio + barrier (most accurate)
+      if(cours&&ratio&&bar){
+        underlyingPrice=curr==="USD"?+(cours*fxR*ratio+bar).toFixed(2):+(cours*ratio+bar).toFixed(2);
+      }
+      // Method 2: from valeur/quantity (mobile fallback when cours unclear)
+      else if(rp.valeur>0&&qty>0&&ratio&&bar){
+        const impliedCours=rp.valeur/qty;
+        underlyingPrice=curr==="USD"?+(impliedCours*fxR*ratio+bar).toFixed(2):+(impliedCours*ratio+bar).toFixed(2);
+      }
+
       if(m){
-        // Update existing
         const u={};
-        if(qty>0)u.quantity=qty;if(rp.pru>0)u.entryPriceTurbo=rp.pru;if(rp.barrier)u.barrier=rp.barrier;if(rp.strike)u.strike=rp.strike||rp.barrier;
-        if(rp.ratio>0)u.ratio=rp.ratio;if(rp.leverage>0)u.leverage=rp.leverage;
-        if(rp.plEur!=null)u.dailyPlEur=rp.plEur;if(rp.plPct!=null)u.dailyPlPct=rp.plPct;
-        if(cours&&ratio&&bar){u.currentPrice=m.currency==="USD"?+(cours*m.fxRate*ratio+bar).toFixed(2):+(cours*ratio+bar).toFixed(2);}
+        if(qty>0)u.quantity=qty;
+        if(rp.pru&&rp.pru>0)u.entryPriceTurbo=rp.pru;
+        else if(rp.pruOrCours&&!m.entryPriceTurbo)u.entryPriceTurbo=rp.pruOrCours;
+        if(rp.barrier)u.barrier=rp.barrier;
+        if(rp.strike)u.strike=rp.strike||rp.barrier;
+        if(rp.ratio>0)u.ratio=rp.ratio;
+        if(rp.leverage>0)u.leverage=rp.leverage;
+        if(rp.dailyPlEur!=null)u.dailyPlEur=rp.dailyPlEur;
+        if(rp.dailyPlPct!=null)u.dailyPlPct=rp.dailyPlPct;
+        if(rp.plLatentEur!=null)u.totalUnrealizedEur=rp.plLatentEur;
+        if(rp.plLatentPct!=null)u.totalUnrealizedPct=rp.plLatentPct;
+        if(rp.valeur>0)u.valeur=rp.valeur; // Direct from DEGIRO
+        if(cours>0)u.cours=cours;
+        if(underlyingPrice>0)u.currentPrice=underlyingPrice;
         ups.push({id:m.id,...u});
       }else{
-        // Create new position
         const info=detect(nameL);
-        const shortName=(rp.name||"").replace(/^SG\s+/i,"").split("Turbo")[0].trim()+" Turbo "+(nameL.includes("put")?"Put":"Call");
-        const curP=cours&&ratio&&bar?(info.c==="USD"?+(cours*info.fx*ratio+bar).toFixed(2):+(cours*ratio+bar).toFixed(2)):0;
+        const baseName=(rp.name||"").replace(/^(SG|BNP|SCG)\s+/i,"").split(/Turbo|TURBO/i)[0].trim();
+        const shortName=baseName+" Turbo "+(nameL.includes("put")?"Put":"Call");
         newPos.push({
-          id:"p_"+Date.now()+"_"+idx,name:shortName,underlying:info.u,
-          currentPrice:curP,barrier:rp.barrier||0,strike:rp.strike||rp.barrier||0,
-          ratio:ratio,quantity:qty||0,entryPriceTurbo:rp.pru||cours||0,
-          currency:info.c,fxRate:info.fx,stopLoss:0,profitTarget:0,
-          leverage:rp.leverage||0,dailyPlEur:rp.plEur||0,dailyPlPct:rp.plPct||0
+          id:"p_"+Date.now()+"_"+idx,
+          name:shortName,underlying:info.u+" ("+info.t+")",ticker:info.t,
+          currentPrice:underlyingPrice,
+          barrier:rp.barrier||0,strike:rp.strike||rp.barrier||0,
+          ratio,quantity:qty||0,
+          entryPriceTurbo:rp.pru||cours||0,
+          cours:cours||0,
+          valeur:rp.valeur||0,
+          currency:info.c,fxRate:info.fx,
+          stopLoss:0,profitTarget:0,
+          leverage:rp.leverage||0,
+          dailyPlEur:rp.dailyPlEur||0,dailyPlPct:rp.dailyPlPct||0,
+          totalUnrealizedEur:rp.plLatentEur,totalUnrealizedPct:rp.plLatentPct
         });
       }
     });
-    onUpdate(ups,{dailyPnlEur:res.dailyPnlEur||0,dailyPnlPct:res.dailyPnlPct||0},newPos);onClose();
+    onUpdate(ups,{
+      dailyPnlEur:res.dailyPnlEur||0,
+      dailyPnlPct:res.dailyPnlPct||0,
+      espaceLibre:res.espaceLibre||0,
+      totalPortefeuille:res.totalPortefeuille||0,
+      plCumulee:res.plCumulee
+    },newPos);
+    onClose();
   };
-  return <div style={{position:"fixed",inset:0,background:"rgba(26,26,46,0.4)",backdropFilter:"blur(4px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:100,padding:16}} onClick={onClose}>
-    <Card style={{maxWidth:480,width:"100%",boxShadow:"0 8px 30px rgba(0,0,0,.12)",maxHeight:"90vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
-      <div style={{fontSize:17,fontWeight:700,color:C.blue,marginBottom:12}}>Update from Screenshot</div>
-      {st!=="done"&&<div className={`drop${drag?" ov":""}`} onDragOver={e=>{e.preventDefault();setDrag(true);}} onDragLeave={()=>setDrag(false)} onDrop={e=>{e.preventDefault();setDrag(false);go(e.dataTransfer.files[0]);}} onClick={()=>ref.current?.click()}>
-        <input ref={ref} type="file" accept="image/*" style={{display:"none"}} onChange={e=>go(e.target.files[0])}/>
-        {st==="idle"&&<><div style={{fontSize:14,fontWeight:600,color:C.blue}}>Drop your DEGIRO screenshot here</div><div style={{fontSize:12,color:C.t3,marginTop:4}}>or click to browse files</div></>}
-        {st==="loading"&&<div style={{color:C.blueA}}>Reading image...</div>}
-        {st==="analyzing"&&<div className="anim"><div style={{fontSize:14,fontWeight:600,color:C.blueA}}>Analyzing portfolio data...</div></div>}
-        {st==="error"&&<div style={{color:C.red,fontWeight:500}}>{err}</div>}
+  return <div style={{position:"fixed",inset:0,background:T.modal,backdropFilter:"blur(4px)",display:"flex",alignItems:"flex-end",justifyContent:"center",zIndex:100,padding:"0"}} onClick={onClose} className="fadeIn">
+    <div style={{background:T.card,borderRadius:"16px 16px 0 0",width:"100%",maxWidth:520,maxHeight:"92vh",overflowY:"auto",padding:"22px"}} onClick={e=>e.stopPropagation()} className="slideUp scroll">
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+        <div style={{fontSize:18,fontWeight:700,color:T.txt}}>Update from Screenshot</div>
+        <button onClick={onClose} style={{color:T.txt3,fontSize:24,padding:4}}>×</button>
+      </div>
+      {st!=="done"&&<div style={{borderColor:drag?T.blueA:T.txt4,background:drag?T.blueT:T.inputBg,color:T.txt2}} className="drop" onDragOver={e=>{e.preventDefault();setDrag(true);}} onDragLeave={()=>setDrag(false)} onDrop={e=>{e.preventDefault();setDrag(false);go(e.dataTransfer.files[0]);}} onClick={()=>ref.current?.click()}>
+        <input ref={ref} type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={e=>go(e.target.files[0])}/>
+        {st==="idle"&&<><div style={{fontSize:14,fontWeight:600,color:T.txt}}>Drop screenshot or tap to select</div><div style={{fontSize:12,color:T.txt3,marginTop:3}}>Camera available on mobile</div></>}
+        {st==="loading"&&<div style={{color:T.blueA}}>Reading...</div>}
+        {st==="analyzing"&&<div className="anim" style={{color:T.blueA,fontWeight:600}}>Analyzing portfolio data...</div>}
+        {st==="error"&&<div style={{color:T.red,fontWeight:500}}>{err}</div>}
       </div>}
-      {prev&&<img src={prev} style={{width:"100%",borderRadius:4,marginTop:10,border:"1px solid "+C.bdr}} alt=""/>}
+      {prev&&<img src={prev} style={{width:"100%",borderRadius:8,marginTop:10,border:"1px solid "+T.border}} alt=""/>}
       {st==="done"&&res&&<div style={{marginTop:14}}>
-        <div style={{background:C.grnBg,borderRadius:4,padding:12,marginBottom:10,fontSize:13,color:C.grn,fontWeight:600}}>Data extracted successfully</div>
-        {(res.positions||[]).map((rp,i)=><div key={i} style={{background:C.bgS,borderRadius:4,padding:10,marginBottom:6,fontSize:12,fontFamily:mono,color:C.t2,border:"1px solid "+C.bdrL}}>
-          <div style={{fontWeight:600,fontFamily:"inherit",marginBottom:4,color:C.txt}}>{(rp.name||"").substring(0,55)}</div>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:3}}>
-            <div>Cours: €{rp.cours}</div><div>PRU: {rp.pru}</div><div>Qty: {rp.quantity}</div>
-            <div>BAR: {rp.barrier}</div><div>R: {rp.ratio}</div><div>LV: {rp.leverage}x</div>
+        <div style={{background:T.grnBg,borderRadius:8,padding:12,marginBottom:10,fontSize:13,color:T.grn,fontWeight:600}}>Data extracted {res.isMobileLayout?"(mobile layout)":"(desktop layout)"}</div>
+        <div style={{background:T.blueT,borderRadius:8,padding:10,marginBottom:8,fontSize:12,color:T.txt2,border:"1px solid "+T.border}}>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:4}} className="mono">
+            {res.totalPortefeuille!=null&&<div>Portefeuille: <b style={{color:T.txt}}>{fE(res.totalPortefeuille)}</b></div>}
+            {res.espaceLibre!=null&&<div>Espace Libre: <b style={{color:T.txt}}>{fE(res.espaceLibre)}</b></div>}
+            {res.dailyPnlEur!=null&&<div style={{color:res.dailyPnlEur>=0?T.grn:T.red}}>Daily: {fS(res.dailyPnlEur)}</div>}
+            {res.plCumulee!=null&&<div style={{color:res.plCumulee>=0?T.grn:T.red}}>Cumulée: {fS(res.plCumulee)}</div>}
+          </div>
+        </div>
+        {(res.positions||[]).map((rp,i)=><div key={i} style={{background:T.inputBg,borderRadius:8,padding:10,marginBottom:6,fontSize:12,color:T.txt2,border:"1px solid "+T.border}} className="mono">
+          <div style={{fontWeight:600,fontFamily:"inherit",marginBottom:4,color:T.txt}}>{(rp.name||"").substring(0,55)}</div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:3,fontSize:11}}>
+            <div>Valeur: €{rp.valeur}</div>
+            <div>Qty: {rp.quantity}</div>
+            <div>Price: €{rp.pruOrCours||rp.cours||rp.pru}</div>
+            <div>BAR: {rp.barrier}</div>
+            <div>R: {rp.ratio}</div>
+            <div>LV: {rp.leverage}x</div>
+            {rp.dailyPlEur!=null&&<div style={{color:rp.dailyPlEur>=0?T.grn:T.red}}>Day: {fS(rp.dailyPlEur)}</div>}
+            {rp.plLatentEur!=null&&<div style={{color:rp.plLatentEur>=0?T.grn:T.red}}>Latent: {fS(rp.plLatentEur)}</div>}
           </div>
         </div>)}
-        <div style={{display:"flex",gap:8,marginTop:10}}><Btn onClick={apply} style={{flex:1,justifyContent:"center"}}>Apply Update</Btn><Btn v="ghost" onClick={()=>{setSt("idle");setPrev(null);setRes(null);}}>Retry</Btn></div>
+        <div style={{display:"flex",gap:8,marginTop:12}}>
+          <button onClick={apply} style={{flex:1,padding:"12px 18px",background:T.blueA,color:"#fff",borderRadius:8,fontSize:14,fontWeight:600}}>Apply Update</button>
+          <button onClick={()=>{setSt("idle");setPrev(null);setRes(null);}} style={{padding:"12px 14px",color:T.txt2,fontSize:13}}>Retry</button>
+        </div>
       </div>}
-      <div style={{textAlign:"right",marginTop:8}}><Btn v="ghost" onClick={onClose}>Close</Btn></div>
-    </Card>
+    </div>
   </div>;
 }
 
 // ══════════ STRATEGY ANALYZER ══════════
-function runStrategy(pos,events,apiKey,cb){
+function runStrategy(pos,events,cash,apiKey,cb){
   if(!apiKey)return cb("Set API key first.");
-  const pd=pos.map(p=>({name:p.name,underlying:p.underlying,turboPrice:+tP(p).toFixed(4),entryPrice:p.entryPriceTurbo,buffer:+bf(p).toFixed(1),leverage:p.leverage,underlyingPrice:p.currentPrice,barrier:p.barrier,strike:p.strike,ratio:p.ratio,quantity:p.quantity,value:+pV(p).toFixed(2),unrealizedPnL:+uPL(p).toFixed(2),unrealizedPct:p.entryPriceTurbo>0?+((uPL(p)/(p.entryPriceTurbo*p.quantity))*100).toFixed(1):0,dailyPlEur:p.dailyPlEur||0,dailyPlPct:p.dailyPlPct||0,currency:p.currency,fxRate:p.fxRate}));
+  const pd=pos.map(p=>({name:p.name,ticker:p.ticker,turboPrice:+tP(p).toFixed(4),entryPrice:p.entryPriceTurbo,buffer:+bf(p).toFixed(1),leverage:p.leverage,underlyingPrice:p.currentPrice,barrier:p.barrier,strike:p.strike,ratio:p.ratio,quantity:p.quantity,value:+pV(p).toFixed(2),unrealizedPnL:+uPL(p).toFixed(2),unrealizedPct:p.entryPriceTurbo>0?+((uPL(p)/(p.entryPriceTurbo*p.quantity))*100).toFixed(1):0,dailyPlEur:p.dailyPlEur||0,currency:p.currency}));
   const ev=events.filter(e=>dTo(e.date)>=0&&dTo(e.date)<=21).map(e=>({title:e.title,date:e.date,daysAway:dTo(e.date),type:e.type}));
+  const totalVal=pos.reduce((s,p)=>s+pV(p),0);
   fetch("https://api.anthropic.com/v1/messages",{method:"POST",
     headers:{"Content-Type":"application/json","x-api-key":apiKey,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
-    body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:2500,
-      messages:[{role:"user",content:`You are a senior trading strategist for leveraged Turbo certificates.
+    body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:3000,
+      messages:[{role:"user",content:`Senior strategist for leveraged Turbo certificates on DEGIRO.
 
-PORTFOLIO:
+PORTFOLIO (€${totalVal.toFixed(0)} invested + €${cash.toFixed(0)} cash in Espace Libre):
 ${JSON.stringify(pd,null,1)}
 
-UPCOMING EVENTS (next 21 days):
+UPCOMING EVENTS (next 21d):
 ${JSON.stringify(ev,null,1)}
 
-Provide strategy analysis as JSON (no markdown, no backticks):
+USER'S TRADING RULES:
+- Max 60% in single position (warn), 80% hard limit
+- Min 15% buffer on entry (warn), 8% hard limit
+- Max 5x leverage (warn), 10x hard limit
+- Scale out 30-50% when unrealized > 100%
+- Reduce 30% before high-impact events within 7 days
+
+DIVERSIFICATION IDEAS approved by user:
+1. ASML Turbo Long x3-4 (semi monopoly, AI capex)
+2. BNP Paribas Turbo Long x3-4 (ECB rates, financials)
+3. Rheinmetall Turbo Long x2-3 (defense, NATO spending)
+4. Gold Turbo Long x2-3 (uncorrelated hedge)
+
+Respond JSON only, no markdown:
 {
-  "summary": "2-3 sentence overall assessment. Be direct.",
+  "summary": "2-3 sentence assessment",
   "riskLevel": "LOW/MODERATE/ELEVATED/HIGH",
-  "actions": [
-    {
-      "type": "SET_STOP_LOSS/TAKE_PROFIT/SCALE_OUT/HOLD/REDUCE_BEFORE_EVENT",
-      "position": "position name",
-      "urgency": "IMMEDIATE/THIS_WEEK/MONITOR",
-      "turboPrice": number or null (specific EUR price for the turbo),
-      "underlyingPrice": number or null,
-      "quantity": number or null (how many units to sell/buy),
-      "profitOrLoss": number or null (EUR amount this action would lock in or prevent),
-      "reasoning": "2-3 sentences. Include the math. Reference buffer %, leverage, and upcoming events."
-    }
-  ],
-  "positionSummaries": [
-    {
-      "name": "position name",
-      "status": "1 sentence current status",
-      "actionNeeded": true/false,
-      "priority": "HIGH/MEDIUM/LOW"
-    }
-  ],
-  "keyRisks": ["risk 1", "risk 2"],
+  "ruleViolations": [{"rule": "...", "severity": "WARN/HARD", "details": "..."}],
+  "actions": [{
+    "type": "SET_STOP_LOSS/TAKE_PROFIT/SCALE_OUT/REDUCE_BEFORE_EVENT/DEPLOY_CASH/HOLD",
+    "position": "name or 'Cash deployment' or 'New position'",
+    "urgency": "IMMEDIATE/THIS_WEEK/MONITOR",
+    "turboPrice": number_or_null,
+    "underlyingPrice": number_or_null,
+    "quantity": number_or_null,
+    "profitOrLoss": number_or_null,
+    "amount": number_or_null,
+    "reasoning": "2-3 sentences with math and rule reference"
+  }],
+  "cashDeployment": ${cash > 100 ? `{
+    "available": ${cash},
+    "suggestions": [{"ticker": "...", "name": "...", "amount": number, "leverage": "Xx", "reasoning": "..."}]
+  }` : "null"},
+  "positionSummaries": [{"name": "...", "status": "...", "actionNeeded": true_or_false, "priority": "HIGH/MEDIUM/LOW"}],
+  "keyRisks": ["..."],
   "outlook": "2-3 sentence forward view"
 }
 
-RULES:
-- For STOP_LOSS: calculate the turbo price where buffer = 8%, and suggest setting stop just above
-- For SCALE_OUT: suggest selling 30-50% when unrealized > 40%. Calculate exact quantity and EUR proceeds.
-- For REDUCE_BEFORE_EVENT: if a binary event is within 7 days, suggest reducing by 30-50%. Calculate.
-- Always include quantity and profitOrLoss for actionable recommendations.
-- Never recommend buying more. Only protective actions and profit-taking.`}]
+CRITICAL: Be specific with numbers. Reference user's trading rules explicitly. For cash deployment, suggest specific tickers from the diversification list with euro amounts that respect the 60% max position rule. For event-based actions, calculate exact reduction quantities.`}]
     })
-  }).then(r=>r.json()).then(d=>{
+  }).then(r=>r.json()).then(d=>{if(d.error)return cb(d.error.message);cb(null,JSON.parse(d.content.map(c=>c.text||"").join("").replace(/```json|```/g,"").trim()));}).catch(e=>cb(e.message));
+}
+
+// ══════════ STOCK INFO FETCHER ══════════
+function fetchStockInfo(ticker,name,sector,apiKey,cb){
+  if(!apiKey)return cb("Set API key first.");
+  fetch("https://api.anthropic.com/v1/messages",{method:"POST",
+    headers:{"Content-Type":"application/json","x-api-key":apiKey,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
+    body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:3000,
+      tools:[{type:"web_search_20250305",name:"web_search"}],
+      messages:[{role:"user",content:`Provide comprehensive current stock data for ${name} (${ticker}), sector: ${sector}. Search the web for the most up-to-date information as of today.
+
+Return ONLY this JSON structure (no markdown):
+{
+  "currentPrice": number,
+  "currency": "USD/EUR",
+  "dailyChange": number,
+  "dailyChangePct": number,
+  "marketCap": "string with B/T",
+  "peRatio": number_or_null,
+  "fwdPe": number_or_null,
+  "ebitdaMargin": "string with %",
+  "yearHigh52": number,
+  "yearLow52": number,
+  "description": "2-3 sentences about the company",
+  "businessLines": [{"name": "segment name", "revenuePct": "approx %", "description": "what they do"}],
+  "latestNews": [{"headline": "...", "date": "YYYY-MM-DD", "summary": "1-2 sentences"}],
+  "earnings": {
+    "lastQuarter": {"date": "YYYY-MM-DD", "revenue": "...", "epsActual": number_or_null, "epsEstimate": number_or_null, "surprise": "string"},
+    "nextDate": "YYYY-MM-DD",
+    "consensus": "1 sentence on what analysts expect"
+  },
+  "analystTargets": {"average": number, "high": number, "low": number, "rating": "Buy/Hold/Sell", "buyCount": number, "holdCount": number, "sellCount": number, "upside": "string with %"},
+  "risks": [{"category": "Economic/Political/Geopolitical/Sector", "event": "...", "impact": "1-2 sentences on mechanics of how it would affect the stock"}]
+}
+
+Be precise with numbers. Use most recent search results. If a field is unknown, use null. Get at least 3 latest news items, at least 3 risks covering different categories.`}]})})
+  .then(r=>r.json()).then(d=>{
     if(d.error)return cb(d.error.message);
-    cb(null,JSON.parse(d.content.map(c=>c.text||"").join("").replace(/```json|```/g,"").trim()));
+    const txt=d.content.filter(c=>c.type==="text").map(c=>c.text||"").join("").replace(/```json|```/g,"").trim();
+    try{cb(null,JSON.parse(txt));}catch(e){cb("Parse error: "+e.message+" | "+txt.substring(0,200));}
   }).catch(e=>cb(e.message));
 }
 
-// ══════════ APP ══════════
+// ══════════ EVENTS REFRESHER ══════════
+function refreshEvents(events,apiKey,cb){
+  if(!apiKey)return cb("Set API key");
+  fetch("https://api.anthropic.com/v1/messages",{method:"POST",
+    headers:{"Content-Type":"application/json","x-api-key":apiKey,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
+    body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:3000,
+      tools:[{type:"web_search_20250305",name:"web_search"}],
+      messages:[{role:"user",content:`Update historical and forward-looking data for these financial events. Search web for current information. Today: ${tod()}.
+
+Events: ${JSON.stringify(events.map(e=>({id:e.id,title:e.title,date:e.date,type:e.type})))}
+
+For each, provide last figure/decision, market impact, and what to expect this time (consensus estimates, key things to watch).
+
+JSON only: [{"id":"...","lastFigure":"1-2 sentences with numbers","marketImpact":"1-2 sentences","expectations":"1-2 sentences with consensus estimates"}]`}]})})
+  .then(r=>r.json()).then(d=>{
+    if(d.error)return cb(d.error.message);
+    const txt=d.content.filter(c=>c.type==="text").map(c=>c.text||"").join("").replace(/```json|```/g,"").trim();
+    try{cb(null,JSON.parse(txt));}catch(e){cb("Parse error");}
+  }).catch(e=>cb(e.message));
+}
+
+// ══════════ MAIN APP ══════════
 function App(){
-  const [pos,setPos]=useState(()=>ld("td10-pos",D_POS));
-  const [events,setEvents]=useState(()=>ld("td10-ev",D_EV));
-  const [snaps,setSnaps]=useState(()=>ld("td10-snap",[]));
-  const [daily,setDaily]=useState(()=>ld("td10-daily",{eur:0,pct:0}));
-  const [strategy,setStrat]=useState(()=>ld("td10-strat",null));
+  const [T,mode,setMode]=useTheme();
+  const [pos,setPos]=useState(()=>ld("td11-pos",[]));
+  const [events,setEvents]=useState(()=>ld("td11-ev",D_EV));
+  const [snaps,setSnaps]=useState(()=>ld("td11-snap",[]));
+  const [daily,setDaily]=useState(()=>ld("td11-daily",{eur:0,pct:0}));
+  const [cumPnl,setCumPnl]=useState(()=>ld("td11-cumpnl",null));
+  const [cash,setCash]=useState(()=>ld("td11-cash",0));
+  const [strategy,setStrat]=useState(()=>ld("td11-strat",null));
+  const [stockCache,setStockCache]=useState(()=>ld("td11-stocks",{}));
   const [stratLoad,setStratLoad]=useState(false);
   const [apiKey,setApiKey]=useState(()=>localStorage.getItem("td-api-key")||"");
-  const [tab,setTab]=useState("portfolio");
-  const [chartV,setChartV]=useState("pnl");
+  const [tab,setTab]=useState("home");
   const [showSS,setShowSS]=useState(false);
-  const [showAddEv,setShowAddEv]=useState(false);
+  const [showStock,setShowStock]=useState(null);
+  const [stockLoad,setStockLoad]=useState(false);
+  const [evLoad,setEvLoad]=useState(false);
   const [closeM,setCloseM]=useState(null);
   const [cQ,setCQ]=useState("");const [cP,setCP]=useState("");
   const [toast,setToast]=useState(null);
+  const [showSettings,setShowSettings]=useState(false);
   const show=m=>{setToast(m);setTimeout(()=>setToast(null),2500);};
   const saveApi=k=>{setApiKey(k);localStorage.setItem("td-api-key",k);};
 
-  useEffect(()=>sv("td10-pos",pos),[pos]);useEffect(()=>sv("td10-ev",events),[events]);
-  useEffect(()=>sv("td8-snap",snaps),[snaps]);useEffect(()=>sv("td10-daily",daily),[daily]);
-  useEffect(()=>sv("td10-strat",strategy),[strategy]);
+  useEffect(()=>sv("td11-pos",pos),[pos]);
+  useEffect(()=>sv("td11-ev",events),[events]);
+  useEffect(()=>sv("td11-snap",snaps),[snaps]);
+  useEffect(()=>sv("td11-daily",daily),[daily]);
+  useEffect(()=>sv("td11-cash",cash),[cash]);
+  useEffect(()=>sv("td11-cumpnl",cumPnl),[cumPnl]);
+  useEffect(()=>sv("td11-strat",strategy),[strategy]);
+  useEffect(()=>sv("td11-stocks",stockCache),[stockCache]);
 
   const snap=useCallback(()=>{
-    const now=new Date();const d=(now.getMonth()+1).toString().padStart(2,"0")+"-"+now.getDate().toString().padStart(2,"0")+" "+now.getHours().toString().padStart(2,"0")+":"+now.getMinutes().toString().padStart(2,"0");
-    const pd={};let tv=0,tc=0;
+    const d=ts(),pd={};let tv=0,tc=0;
     pos.forEach(p=>{const v=pV(p);tv+=v;tc+=p.entryPriceTurbo*p.quantity;pd[p.id]={name:p.name,price:p.currentPrice,buffer:+bf(p).toFixed(1),value:+v.toFixed(2)};});
-    const sn={date:d,totalValue:+tv.toFixed(2),unrealizedPnL:+(tv-tc).toFixed(2),dailyPnlEur:daily.eur,positions:pd};
-    setSnaps(pr=>[...pr,sn].slice(-90));
-  },[pos,daily]);
+    setSnaps(pr=>[...pr,{date:d,totalValue:+tv.toFixed(2),unrealizedPnL:+(tv-tc).toFixed(2),dailyPnlEur:daily.eur,cash,positions:pd}].slice(-90));
+  },[pos,daily,cash]);
 
   const [pendSnap,setPendSnap]=useState(false);
   const handleUpdate=(ups,meta,newPositions)=>{
-    if(ups?.length){
-      setPos(ps=>{let n=[...ps];ups.forEach(u=>{const{id,...r}=u;n=n.map(p=>p.id===id?{...p,...r}:p);});return n;});
+    if(ups?.length)setPos(ps=>{let n=[...ps];ups.forEach(u=>{const{id,...r}=u;n=n.map(p=>p.id===id?{...p,...r}:p);});return n;});
+    if(newPositions?.length)setPos(ps=>[...ps,...newPositions]);
+    if(meta){
+      setDaily({eur:meta.dailyPnlEur||0,pct:meta.dailyPnlPct||0});
+      if(meta.espaceLibre!=null)setCash(meta.espaceLibre);
+      if(meta.plCumulee!=null)setCumPnl(meta.plCumulee);
     }
-    if(newPositions?.length){
-      setPos(ps=>[...ps,...newPositions]);
-    }
-    if(meta)setDaily({eur:meta.dailyPnlEur||0,pct:meta.dailyPnlPct||0});
-    setPendSnap(true);show("Portfolio updated");
-    if(apiKey)setTimeout(()=>{setStratLoad(true);runStrategy(pos,events,apiKey,(e,r)=>{setStratLoad(false);if(!e)setStrat(r);});},400);
+    setPendSnap(true);show("Updated successfully");
+    if(apiKey)setTimeout(()=>{setStratLoad(true);runStrategy(pos,events,meta?.espaceLibre||cash,apiKey,(e,r)=>{setStratLoad(false);if(!e)setStrat(r);});},500);
   };
   useEffect(()=>{if(pendSnap){snap();setPendSnap(false);}},[pos,pendSnap]);
 
-  const tV=pos.reduce((s,p)=>s+pV(p),0);const tC=pos.reduce((s,p)=>s+p.entryPriceTurbo*p.quantity,0);
+  const tV=pos.reduce((s,p)=>s+pV(p),0);
+  const tC=pos.reduce((s,p)=>s+p.entryPriceTurbo*p.quantity,0);
   const tU=tV-tC;const tUP=tC>0?(tU/tC)*100:0;
-  const upcoming=[...events].filter(e=>dTo(e.date)>=0).sort((a,b)=>new Date(a.date)-new Date(b.date)).slice(0,6);
-  const urgent=upcoming.filter(e=>dTo(e.date)<=7);
+  const totalAccount=tV+cash;
+  const upcoming=[...events].filter(e=>dTo(e.date)>=0).sort((a,b)=>new Date(a.date)-new Date(b.date)).slice(0,5);
 
-  const pnlD=snaps.map(s=>({date:s.date,Unrealized:s.unrealizedPnL,Daily:s.dailyPnlEur||0,Value:s.totalValue}));
-  const bfN=pos.map(p=>p.name);
-  const bfD=snaps.map(s=>{const e={date:s.date};Object.values(s.positions||{}).forEach(d=>{e[d.name]=d.buffer;});return e;});
+  const openStock=(stock)=>{
+    setShowStock({...stock,loading:true});
+    const cacheKey=stock.ticker;
+    const cached=stockCache[cacheKey];
+    const oneHour=3600000;
+    if(cached&&(Date.now()-cached._fetched)<oneHour){
+      setShowStock({...stock,...cached,loading:false});return;
+    }
+    setStockLoad(true);
+    fetchStockInfo(stock.ticker,stock.name,stock.sector,apiKey,(err,data)=>{
+      setStockLoad(false);
+      if(err){show("Failed: "+err);setShowStock({...stock,loading:false,error:err});return;}
+      const enriched={...data,_fetched:Date.now()};
+      setStockCache(c=>({...c,[cacheKey]:enriched}));
+      setShowStock({...stock,...enriched,loading:false});
+    });
+  };
 
-  const tabs=[{k:"portfolio",l:"Portfolio"},{k:"strategy",l:"Strategy"},{k:"charts",l:"Charts"},{k:"events",l:"Events"}];
+  const refreshStock=()=>{
+    if(!showStock)return;
+    setStockCache(c=>{const n={...c};delete n[showStock.ticker];return n;});
+    openStock(showStock);
+  };
 
-  return <div style={{background:C.bg,minHeight:"100vh"}}>
-    {toast&&<div style={{position:"fixed",top:12,left:"50%",transform:"translateX(-50%)",zIndex:200,background:C.blue,color:C.w,padding:"9px 22px",borderRadius:4,fontWeight:600,fontSize:13,boxShadow:"0 4px 12px rgba(0,0,0,.15)",animation:"fadeIn .25s"}}>{toast}</div>}
+  const refreshEv=()=>{
+    if(!apiKey)return show("Set API key");
+    setEvLoad(true);
+    refreshEvents(events,apiKey,(err,upd)=>{
+      setEvLoad(false);
+      if(err)return show(err);
+      setEvents(es=>es.map(ev=>{const u=upd.find(x=>x.id===ev.id);return u?{...ev,lastFigure:u.lastFigure,marketImpact:u.marketImpact,expectations:u.expectations}:ev;}));
+      show("Events refreshed");
+    });
+  };
 
-    {/* ═══ HEADER ═══ */}
-    <div style={{background:C.blue,padding:"16px 20px 18px",color:C.w}}>
-      <div style={{maxWidth:800,margin:"0 auto"}}>
+  const tabs=[{k:"home",l:"Home"},{k:"stocks",l:"Stocks"},{k:"strategy",l:"Strategy"},{k:"events",l:"Events"}];
+
+  return <div style={{background:T.bg,minHeight:"100vh",color:T.txt,paddingBottom:80}}>
+    {toast&&<div style={{position:"fixed",top:14,left:"50%",transform:"translateX(-50%)",zIndex:300,background:T.txt,color:T.bg,padding:"9px 20px",borderRadius:8,fontWeight:600,fontSize:13,boxShadow:"0 4px 14px rgba(0,0,0,.2)"}} className="fadeIn">{toast}</div>}
+
+    {/* HEADER */}
+    <div style={{background:T.headerBg,padding:"16px 18px 18px",color:T.headerTxt,position:"sticky",top:0,zIndex:50}}>
+      <div style={{maxWidth:780,margin:"0 auto"}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:14}}>
           <div>
-            <div style={{fontSize:11,fontWeight:400,opacity:.55,letterSpacing:".05em",textTransform:"uppercase",marginBottom:2}}>Turbo Dashboard</div>
-            <div style={{fontSize:30,fontWeight:700,letterSpacing:"-.03em",fontFamily:mono}}>{fE(tV)}</div>
+            <div style={{fontSize:11,opacity:.55,letterSpacing:".06em",textTransform:"uppercase",marginBottom:2}}>Total Account</div>
+            <div style={{fontSize:28,fontWeight:700,letterSpacing:"-.03em"}} className="mono">{fE(totalAccount)}</div>
+            <div style={{fontSize:11,opacity:.5,marginTop:1}}>Portfolio {fE(tV)} · Cash {fE(cash)}</div>
           </div>
-          <button onClick={()=>setShowSS(true)} style={{background:"rgba(255,255,255,.12)",color:C.w,border:"1px solid rgba(255,255,255,.2)",borderRadius:4,padding:"9px 18px",fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>Update</button>
-        </div>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-          <div style={{background:"rgba(255,255,255,.08)",borderRadius:4,padding:"10px 14px"}}>
-            <div style={{fontSize:10,opacity:.5,textTransform:"uppercase",letterSpacing:".05em",marginBottom:2}}>Daily P&L</div>
-            <div style={{fontSize:20,fontWeight:700,color:daily.eur>=0?"#4ade80":"#f87171",fontFamily:mono}}>{fS(daily.eur)}</div>
-            <div style={{fontSize:12,color:daily.pct>=0?"#4ade80":"#f87171",opacity:.8}}>{fP(daily.pct)}</div>
-          </div>
-          <div style={{background:"rgba(255,255,255,.08)",borderRadius:4,padding:"10px 14px"}}>
-            <div style={{fontSize:10,opacity:.5,textTransform:"uppercase",letterSpacing:".05em",marginBottom:2}}>Unrealized P&L</div>
-            <div style={{fontSize:20,fontWeight:700,color:tU>=0?"#4ade80":"#f87171",fontFamily:mono}}>{fS(tU)}</div>
-            <div style={{fontSize:12,color:tUP>=0?"#4ade80":"#f87171",opacity:.8}}>{fP(tUP)}</div>
+          <div style={{display:"flex",gap:6}}>
+            <button onClick={()=>setShowSettings(true)} style={{background:"rgba(255,255,255,.1)",color:T.headerTxt,padding:"7px 11px",borderRadius:7,fontSize:13}}>⚙</button>
+            <button onClick={()=>setShowSS(true)} style={{background:"rgba(255,255,255,.16)",color:T.headerTxt,padding:"8px 16px",borderRadius:7,fontSize:13,fontWeight:600}}>Update</button>
           </div>
         </div>
-        {urgent.length>0&&<div style={{marginTop:10,fontSize:11,color:"#fbbf24"}}>{urgent.length} event{urgent.length>1?"s":""} within 7 days</div>}
-        {snaps.length>0&&<div style={{marginTop:urgent.length>0?4:10,fontSize:10,opacity:.4}}>Last update: {snaps[snaps.length-1].date} — {snaps.length} snapshots recorded</div>}
+        <div style={{display:"grid",gridTemplateColumns:cumPnl!=null?"1fr 1fr 1fr":"1fr 1fr",gap:6}}>
+          <div style={{background:"rgba(255,255,255,.08)",borderRadius:8,padding:"9px 11px"}}>
+            <div style={{fontSize:9,opacity:.5,textTransform:"uppercase",letterSpacing:".05em",marginBottom:1}}>Daily P&L</div>
+            <div style={{fontSize:16,fontWeight:700,color:daily.eur>=0?"#4ade80":"#f87171"}} className="mono">{fS(daily.eur)}</div>
+            <div style={{fontSize:10,color:daily.pct>=0?"#4ade80":"#f87171",opacity:.85}}>{fP(daily.pct)}</div>
+          </div>
+          <div style={{background:"rgba(255,255,255,.08)",borderRadius:8,padding:"9px 11px"}}>
+            <div style={{fontSize:9,opacity:.5,textTransform:"uppercase",letterSpacing:".05em",marginBottom:1}}>Unrealized</div>
+            <div style={{fontSize:16,fontWeight:700,color:tU>=0?"#4ade80":"#f87171"}} className="mono">{fS(tU)}</div>
+            <div style={{fontSize:10,color:tUP>=0?"#4ade80":"#f87171",opacity:.85}}>{fP(tUP)}</div>
+          </div>
+          {cumPnl!=null&&<div style={{background:"rgba(255,255,255,.08)",borderRadius:8,padding:"9px 11px"}}>
+            <div style={{fontSize:9,opacity:.5,textTransform:"uppercase",letterSpacing:".05em",marginBottom:1}}>P&L Cumulée</div>
+            <div style={{fontSize:16,fontWeight:700,color:cumPnl>=0?"#4ade80":"#f87171"}} className="mono">{fS(cumPnl)}</div>
+            <div style={{fontSize:10,opacity:.5}}>since inception</div>
+          </div>}
+        </div>
       </div>
     </div>
 
-    {showSS&&<Screenshotter positions={pos} apiKey={apiKey} onUpdate={handleUpdate} onClose={()=>setShowSS(false)}/>}
+    {showSS&&<Screenshotter T={T} positions={pos} apiKey={apiKey} onUpdate={handleUpdate} onClose={()=>setShowSS(false)}/>}
+    {showSettings&&<SettingsModal T={T} mode={mode} setMode={setMode} apiKey={apiKey} saveApi={saveApi} onClose={()=>setShowSettings(false)}/>}
+    {showStock&&<StockDetailPage T={T} stock={showStock} loading={stockLoad} onClose={()=>setShowStock(null)} onRefresh={refreshStock}/>}
 
-    {/* ═══ TABS ═══ */}
-    <div style={{borderBottom:"1px solid "+C.bdr,background:C.w,position:"sticky",top:0,zIndex:20}}>
-      <div style={{maxWidth:800,margin:"0 auto",display:"flex"}}>
-        {tabs.map(t=><button key={t.k} onClick={()=>setTab(t.k)} style={{background:"none",border:"none",borderBottom:tab===t.k?"2px solid "+C.blueA:"2px solid transparent",color:tab===t.k?C.blueA:C.t3,padding:"12px 20px",cursor:"pointer",fontSize:13,fontWeight:600,fontFamily:"inherit"}}>{t.l}</button>)}
-      </div>
-    </div>
+    <div style={{maxWidth:780,margin:"0 auto",padding:"16px 14px"}}>
 
-    <div style={{maxWidth:800,margin:"0 auto",padding:"18px 16px"}}>
-
-    {/* ═══ PORTFOLIO ═══ */}
-    {tab==="portfolio"&&<>
-      {pos.length===0&&<Card style={{textAlign:"center",padding:"40px 24px"}}>
-        <div style={{fontSize:20,fontWeight:700,color:C.blue,marginBottom:8}}>Welcome to Turbo Dashboard</div>
-        <div style={{fontSize:14,color:C.t2,lineHeight:1.6,maxWidth:420,margin:"0 auto",marginBottom:20}}>
-          Track your DEGIRO leveraged certificates with real-time P&L, buffer monitoring, strategy recommendations, and event calendars.
+    {/* HOME */}
+    {tab==="home"&&<>
+      {pos.length===0&&<div style={{background:T.card,borderRadius:12,padding:"36px 22px",textAlign:"center",border:"1px solid "+T.border}}>
+        <div style={{fontSize:20,fontWeight:700,color:T.blue,marginBottom:8}}>Welcome</div>
+        <div style={{fontSize:13,color:T.txt2,lineHeight:1.6,maxWidth:380,margin:"0 auto",marginBottom:18}}>Track your DEGIRO leveraged certificates with real-time P&L, strategy recommendations, and stock research.</div>
+        <div style={{fontSize:13,color:T.txt2,lineHeight:1.7,textAlign:"left",maxWidth:340,margin:"0 auto",marginBottom:20}}>
+          <div><span style={{color:T.blueA,fontWeight:700}}>1.</span> Set your Anthropic API key in Settings (top right ⚙)</div>
+          <div><span style={{color:T.blueA,fontWeight:700}}>2.</span> Tap Update and drop your DEGIRO screenshot</div>
+          <div><span style={{color:T.blueA,fontWeight:700}}>3.</span> Positions and cash auto-extract</div>
         </div>
-        <div style={{fontSize:13,color:C.t2,lineHeight:1.7,textAlign:"left",maxWidth:380,margin:"0 auto",marginBottom:24}}>
-          <div style={{marginBottom:10}}><span style={{fontWeight:700,color:C.blue}}>1.</span> Enter your Anthropic API key in the <span style={{fontWeight:600}}>Strategy</span> tab</div>
-          <div style={{marginBottom:10}}><span style={{fontWeight:700,color:C.blue}}>2.</span> Take a screenshot of your DEGIRO portfolio page</div>
-          <div><span style={{fontWeight:700,color:C.blue}}>3.</span> Click <span style={{fontWeight:600}}>Update</span> above and drop the screenshot — your positions will be created automatically</div>
-        </div>
-        <Btn onClick={()=>setShowSS(true)} style={{fontSize:14,padding:"12px 28px"}}>Upload your first screenshot</Btn>
-        <div style={{fontSize:11,color:C.t3,marginTop:16}}>All data stays in your browser. Nothing is stored on any server.</div>
-      </Card>}
+        <button onClick={()=>setShowSS(true)} style={{background:T.blueA,color:"#fff",padding:"11px 24px",borderRadius:8,fontSize:14,fontWeight:600}}>Upload screenshot</button>
+      </div>}
+
       {pos.map(p=>{
-        const b=bf(p),bi=bI(b),tp=tP(p),up=uPL(p),val=pV(p);
+        const b=bf(p),bi=bI(b,T),tp=tP(p),up=uPL(p),val=pV(p);
         const upP=p.entryPriceTurbo>0?(up/(p.entryPriceTurbo*p.quantity))*100:0;
         const alloc=tV>0?(val/tV)*100:0;
         const imp=dl(p)*p.currentPrice*0.01;
-        return <Card key={p.id}>
-          {/* Header */}
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:14}}>
+
+        return <div key={p.id} style={{background:T.card,borderRadius:12,padding:"16px 18px",marginBottom:11,border:"1px solid "+T.border}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:12}}>
             <div>
-              <div style={{fontSize:16,fontWeight:700,color:C.blue}}>{p.name}</div>
-              <div style={{fontSize:12,color:C.t3}}>{p.underlying} — {p.quantity.toLocaleString()} units</div>
+              <div style={{fontSize:15,fontWeight:700,color:T.txt}}>{p.name}</div>
+              <div style={{fontSize:11,color:T.txt3}}>{p.underlying} — {p.quantity.toLocaleString()} units</div>
             </div>
             <div style={{display:"flex",gap:6}}>
-              <Btn v="sec" onClick={()=>setCloseM(p)} style={{fontSize:12}}>Scale Out</Btn>
-              <Btn v="danger" onClick={()=>setPos(ps=>ps.filter(x=>x.id!==p.id))} style={{fontSize:12,padding:"6px 10px"}}>Remove</Btn>
+              <button onClick={()=>setCloseM(p)} style={{background:T.blueL,color:T.blueA,padding:"6px 12px",borderRadius:7,fontSize:12,fontWeight:600}}>Scale Out</button>
+              <button onClick={()=>setPos(ps=>ps.filter(x=>x.id!==p.id))} style={{background:T.redBg,color:T.red,padding:"6px 9px",borderRadius:7,fontSize:12}}>×</button>
             </div>
           </div>
 
           {/* Buffer */}
-          <div style={{background:C.bgS,borderRadius:4,padding:"12px 16px",marginBottom:14,border:"1px solid "+C.bdrL}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
-              <span style={{fontSize:10,fontWeight:600,color:C.t3,textTransform:"uppercase",letterSpacing:".06em"}}>Buffer to Knock-Out</span>
+          <div style={{background:T.inputBg,borderRadius:8,padding:"11px 14px",marginBottom:10,border:"1px solid "+T.border}}>
+            <div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}>
+              <span style={{fontSize:10,color:T.txt3,textTransform:"uppercase",letterSpacing:".05em",fontWeight:600}}>Buffer</span>
               <span style={{fontSize:10,fontWeight:700,color:bi.c,textTransform:"uppercase"}}>{bi.l}</span>
             </div>
             <div className="tip" style={{display:"inline-block"}}>
-              <div style={{fontSize:26,fontWeight:700,color:bi.c,fontFamily:mono,letterSpacing:"-.03em"}}>{b.toFixed(1)}%</div>
-              <div className="tiptext">Buffer = (Underlying − Barrier) / Underlying × 100{"\n"}= ({p.currentPrice} − {p.barrier}) / {p.currentPrice} × 100{"\n"}= {b.toFixed(2)}%</div>
+              <div style={{fontSize:24,fontWeight:700,color:bi.c,letterSpacing:"-.03em"}} className="mono">{b.toFixed(1)}%</div>
+              <div className="tt">Buffer = (Underlying − Barrier) / Underlying × 100{"\n"}= ({p.currentPrice} − {p.barrier}) / {p.currentPrice} × 100{"\n"}= {b.toFixed(2)}%</div>
             </div>
-            <div style={{height:4,background:C.bdrL,borderRadius:2,marginTop:6,overflow:"hidden"}}><div style={{width:Math.min(b,50)*2+"%",height:"100%",background:bi.c,borderRadius:2}}/></div>
-            <div style={{fontSize:11,color:C.t3,marginTop:6}}>Barrier: {p.currency==="USD"?"$":"€"}{p.barrier} — Underlying: {p.currency==="USD"?"$":"€"}{p.currentPrice}</div>
+            <div style={{height:3,background:T.borderL,borderRadius:2,marginTop:5}}><div style={{width:Math.min(b,50)*2+"%",height:"100%",background:bi.c,borderRadius:2}}/></div>
+            <div style={{fontSize:10,color:T.txt3,marginTop:5}}>Barrier {p.currency==="USD"?"$":"€"}{p.barrier} · Underlying {p.currency==="USD"?"$":"€"}{p.currentPrice}</div>
           </div>
 
-          {/* Daily P&L */}
-          {(p.dailyPlEur||p.dailyPlPct)?<div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",marginBottom:10,borderBottom:"1px solid "+C.bdrL}}>
-            <span style={{fontSize:12,color:C.t2}}>Today's P&L</span>
-            <div style={{display:"flex",gap:8,alignItems:"baseline"}}>
-              <span style={{fontSize:15,fontWeight:700,color:p.dailyPlEur>=0?C.grn:C.red,fontFamily:mono}}>{fS(p.dailyPlEur)}</span>
-              <span style={{fontSize:12,color:p.dailyPlPct>=0?C.grn:C.red,fontFamily:mono}}>{fP(p.dailyPlPct)}</span>
+          {/* Daily P&L bar */}
+          {(p.dailyPlEur||p.dailyPlPct)?<div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 0",marginBottom:8,borderBottom:"1px solid "+T.borderL}}>
+            <span style={{fontSize:11,color:T.txt2}}>Today</span>
+            <div style={{display:"flex",gap:7}}>
+              <span style={{fontSize:14,fontWeight:700,color:p.dailyPlEur>=0?T.grn:T.red}} className="mono">{fS(p.dailyPlEur)}</span>
+              <span style={{fontSize:11,color:p.dailyPlPct>=0?T.grn:T.red}} className="mono">{fP(p.dailyPlPct)}</span>
             </div>
           </div>:null}
 
-          {/* Metrics grid */}
-          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(125px,1fr))",gap:6}}>
-            <Metric label="Turbo Price" value={"€"+fR(tp)} formula={`Turbo = (Underlying − Strike) / Ratio / FX\n= (${p.currentPrice} − ${p.strike}) / ${p.ratio} / ${p.fxRate}\n= €${fR(tp)}`}/>
-            <Metric label="Leverage" value={p.leverage+"x"} color={p.leverage>10?C.red:p.leverage>7?C.org:C.txt} formula={`Leverage from product name: LV ${p.leverage}\nCalculated: ${p.currentPrice} / (${p.currentPrice} − ${p.strike}) = ${(p.currentPrice/(p.currentPrice-p.strike)).toFixed(2)}x`}/>
-            <Metric label="Position Value" value={fE(val)} formula={`Value = Quantity × Turbo Price\n= ${p.quantity} × €${fR(tp)}\n= ${fE(val)}`}/>
-            <Metric label="Unrealized P&L" value={fS(up)} sub={fP(upP)} color={up>=0?C.grn:C.red} formula={`P&L = (Current Turbo − Entry) × Qty\n= (€${fR(tp)} − €${p.entryPriceTurbo.toFixed(4)}) × ${p.quantity}\n= ${fS(up)}`}/>
-            <Metric label="PRU (Entry)" value={"€"+p.entryPriceTurbo.toFixed(4)} formula={`PRU = Prix de Revient Unitaire\nYour average cost per turbo certificate.\nFrom DEGIRO: €${p.entryPriceTurbo.toFixed(6)}`}/>
-            <Metric label="Delta" value={"€"+dl(p).toFixed(2)} formula={`Delta = Qty × (1/Ratio) × (1/FX)\n= ${p.quantity} × (1/${p.ratio}) × (1/${p.fxRate})\n= €${dl(p).toFixed(2)} per $1 move`}/>
-            <Metric label="1% Impact" value={fE(imp)} formula={`Impact = Delta × Underlying × 1%\n= ${dl(p).toFixed(2)} × ${p.currentPrice} × 0.01\n= ${fE(imp)} (${(imp/tV*100).toFixed(1)}% of portfolio)`}/>
-            <Metric label="Weight" value={alloc.toFixed(1)+"%"} formula={`Allocation = Position Value / Total\n= ${fE(val)} / ${fE(tV)}\n= ${alloc.toFixed(1)}%`}/>
+          {/* Metrics */}
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(105px,1fr))",gap:5}}>
+            {[
+              {l:"Turbo Price",v:p.cours&&p.cours>0?"€"+fR(p.cours):"€"+fR(tp),f:`Cours from DEGIRO: €${fR(tp)}`},
+              {l:"Leverage",v:p.leverage+"x",c:p.leverage>10?T.red:p.leverage>5?T.org:T.txt,f:`Direct from DEGIRO product name (LV)`},
+              {l:"Value",v:fE(val),f:`From DEGIRO Valeur column: ${fE(val)}`},
+              ...(p.totalUnrealizedEur!=null?[{l:"Total P&L",v:fS(p.totalUnrealizedEur),s:p.totalUnrealizedPct!=null?fP(p.totalUnrealizedPct):null,c:p.totalUnrealizedEur>=0?T.grn:T.red,f:`P/L LATENT from DEGIRO desktop`}]:[]),
+              {l:"PRU",v:"€"+p.entryPriceTurbo.toFixed(4),f:`Your average cost basis from DEGIRO`},
+              {l:"Delta",v:"€"+dl(p).toFixed(2),f:`Delta = Qty × (1/Ratio) × (1/FX)\n= ${p.quantity} × (1/${p.ratio}) × (1/${p.fxRate})`},
+              ...(p.currentPrice>0?[{l:"1% Move",v:fE(imp),f:`Impact = Delta × Underlying × 1%\n= €${dl(p).toFixed(2)} × ${p.currentPrice} × 0.01\n= ${fE(imp)}`}]:[]),
+              {l:"Weight",v:alloc.toFixed(1)+"%",c:alloc>RULES.maxPosWeight?T.org:T.txt,f:`Allocation = Position Value / Portfolio\n= ${fE(val)} / ${fE(tV)}\nMax recommended: ${RULES.maxPosWeight}%`}
+            ].map((m,i)=>(
+              <div key={i} className="tip" style={{background:T.inputBg,borderRadius:7,padding:"7px 9px",border:"1px solid "+T.borderL}}>
+                <div style={{fontSize:9,color:T.txt3,textTransform:"uppercase",letterSpacing:".05em",fontWeight:600,marginBottom:1}}>{m.l}</div>
+                <div style={{fontSize:13,fontWeight:700,color:m.c||T.txt}} className="mono">{m.v}</div>
+                {m.s&&<div style={{fontSize:10,color:m.c||T.txt3}} className="mono">{m.s}</div>}
+                <div className="tt">{m.f}</div>
+              </div>
+            ))}
           </div>
-        </Card>;
+        </div>;
       })}
 
-      {/* Scale Out Modal */}
-      {closeM&&<div style={{position:"fixed",inset:0,background:"rgba(26,26,46,.4)",backdropFilter:"blur(3px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:100,padding:16}} onClick={()=>setCloseM(null)}>
-        <Card style={{maxWidth:380,width:"100%",boxShadow:"0 8px 30px rgba(0,0,0,.12)"}} onClick={e=>e.stopPropagation()}>
-          <div style={{fontSize:16,fontWeight:700,color:C.blue,marginBottom:12}}>Scale Out — {closeM.name}</div>
-          <div style={{fontSize:12,color:C.t3,marginBottom:14}}>{closeM.quantity.toLocaleString()} units available</div>
-          <Inp label="Quantity to sell" type="number" value={cQ} onChange={e=>setCQ(e.target.value)}/>
-          <Inp label="Exit price per turbo (€)" type="number" step="0.01" value={cP} onChange={e=>setCP(e.target.value)}/>
+      {closeM&&<div style={{position:"fixed",inset:0,background:T.modal,backdropFilter:"blur(3px)",display:"flex",alignItems:"flex-end",zIndex:100}} onClick={()=>setCloseM(null)} className="fadeIn">
+        <div style={{background:T.card,borderRadius:"14px 14px 0 0",width:"100%",maxWidth:420,margin:"0 auto",padding:20}} onClick={e=>e.stopPropagation()} className="slideUp">
+          <div style={{fontSize:16,fontWeight:700,color:T.txt,marginBottom:4}}>Scale Out — {closeM.name}</div>
+          <div style={{fontSize:12,color:T.txt3,marginBottom:14}}>{closeM.quantity.toLocaleString()} units available</div>
+          <input type="number" value={cQ} onChange={e=>setCQ(e.target.value)} placeholder="Quantity" style={{width:"100%",padding:"10px 12px",background:T.inputBg,border:"1px solid "+T.inputBdr,borderRadius:7,color:T.txt,fontSize:14,marginBottom:8}} className="mono"/>
+          <input type="number" step="0.01" value={cP} onChange={e=>setCP(e.target.value)} placeholder="Exit price (€)" style={{width:"100%",padding:"10px 12px",background:T.inputBg,border:"1px solid "+T.inputBdr,borderRadius:7,color:T.txt,fontSize:14,marginBottom:12}} className="mono"/>
           {cQ&&cP&&(()=>{const q=parseInt(cQ)||0,pr=parseFloat(cP)||0,pnl=(pr-closeM.entryPriceTurbo)*q;
-            return <div style={{background:C.bgS,borderRadius:4,padding:12,marginBottom:12,fontFamily:mono,fontSize:13,border:"1px solid "+C.bdrL}}>
-              <div>Proceeds: {fE(pr*q)}</div>
-              <div style={{fontSize:16,fontWeight:700,color:pnl>=0?C.grn:C.red,marginTop:3}}>P&L: {fS(pnl)}</div>
+            return <div style={{background:T.inputBg,borderRadius:8,padding:12,marginBottom:12,border:"1px solid "+T.border}} className="mono">
+              <div style={{fontSize:12,color:T.txt2}}>Proceeds: {fE(pr*q)}</div>
+              <div style={{fontSize:16,fontWeight:700,color:pnl>=0?T.grn:T.red,marginTop:3}}>P&L: {fS(pnl)}</div>
             </div>;})()}
-          <div style={{display:"flex",gap:8}}><Btn onClick={()=>{const q=parseInt(cQ)||0,pr=parseFloat(cP)||0;if(q<=0||pr<=0||q>closeM.quantity)return;setPos(ps=>ps.map(p=>p.id===closeM.id?{...p,quantity:p.quantity-q}:p));setCloseM(null);setCQ("");setCP("");}}>Confirm</Btn><Btn v="ghost" onClick={()=>setCloseM(null)}>Cancel</Btn></div>
-        </Card>
+          <div style={{display:"flex",gap:8}}>
+            <button onClick={()=>{const q=parseInt(cQ)||0,pr=parseFloat(cP)||0;if(q<=0||pr<=0||q>closeM.quantity)return;const proceeds=pr*q;setPos(ps=>ps.map(p=>p.id===closeM.id?{...p,quantity:p.quantity-q}:p).filter(p=>p.quantity>0));setCash(c=>c+proceeds);setCloseM(null);setCQ("");setCP("");show("Scaled out, cash updated");}} style={{flex:1,background:T.blueA,color:"#fff",padding:"11px 16px",borderRadius:7,fontSize:14,fontWeight:600}}>Confirm</button>
+            <button onClick={()=>setCloseM(null)} style={{padding:"11px 14px",color:T.txt2,fontSize:13}}>Cancel</button>
+          </div>
+        </div>
       </div>}
 
-      {/* Events preview */}
-      {upcoming.length>0&&<Card>
-        <div style={{fontSize:13,fontWeight:700,color:C.blue,marginBottom:10}}>Upcoming Events</div>
-        {upcoming.slice(0,3).map(ev=>{const d=dTo(ev.date);return <div key={ev.id} style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderBottom:"1px solid "+C.bdrL}}>
-          <span style={{fontSize:13,fontWeight:500}}>{ev.title} <span style={{color:C.t3,fontSize:11}}>{ev.date}</span></span>
-          <span style={{fontSize:11,fontWeight:700,color:d<=2?C.red:d<=7?C.org:C.t3,fontFamily:mono}}>{d===0?"TODAY":d===1?"TMR":d+"d"}</span>
+      {pos.length>0&&upcoming.length>0&&<div style={{background:T.card,borderRadius:12,padding:"14px 18px",border:"1px solid "+T.border}}>
+        <div style={{fontSize:13,fontWeight:700,color:T.txt,marginBottom:10}}>Upcoming Events</div>
+        {upcoming.slice(0,3).map(ev=>{const d=dTo(ev.date);return <div key={ev.id} style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderBottom:"1px solid "+T.borderL}}>
+          <span style={{fontSize:13,color:T.txt}}>{ev.title} <span style={{color:T.txt3,fontSize:11}}>{ev.date}</span></span>
+          <span style={{fontSize:11,fontWeight:700,color:d<=2?T.red:d<=7?T.org:T.txt3}} className="mono">{d===0?"TODAY":d===1?"TMR":d+"d"}</span>
         </div>;})}
-      </Card>}
-    </>}
-
-    {/* ═══ STRATEGY ═══ */}
-    {tab==="strategy"&&<>
-      <Card>
-        <div style={{fontSize:13,fontWeight:700,color:C.blue,marginBottom:8}}>API Configuration</div>
-        <div style={{display:"flex",gap:8}}>
-          <input type="password" value={apiKey} onChange={e=>saveApi(e.target.value)} placeholder="sk-ant-..." style={{background:C.bgS,border:"1px solid "+C.bdr,borderRadius:4,padding:"8px 11px",color:C.txt,fontFamily:mono,fontSize:12,flex:1,outline:"none"}}/>
-          <Btn onClick={()=>{setStratLoad(true);runStrategy(pos,events,apiKey,(e,r)=>{setStratLoad(false);if(e)show(e);else{setStrat(r);show("Analysis complete");}});}}>{stratLoad?"Analyzing...":"Run Analysis"}</Btn>
-        </div>
-        <div style={{fontSize:11,color:C.t3,marginTop:4}}>Stored in browser. Auto-runs on each screenshot upload.</div>
-      </Card>
-
-      {stratLoad&&<Card style={{textAlign:"center",padding:28}}><div className="anim" style={{color:C.blueA,fontWeight:600}}>Analyzing portfolio and market conditions...</div></Card>}
-
-      {strategy&&!stratLoad&&<>
-        <Card>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
-            <div style={{fontSize:15,fontWeight:700,color:C.blue}}>Assessment</div>
-            <span style={{fontSize:11,fontWeight:700,color:strategy.riskLevel==="LOW"?C.grn:strategy.riskLevel==="MODERATE"?C.blueA:strategy.riskLevel==="ELEVATED"?C.org:C.red,textTransform:"uppercase",letterSpacing:".05em"}}>{strategy.riskLevel} risk</span>
-          </div>
-          <div style={{fontSize:13,color:C.t2,lineHeight:1.65}}>{strategy.summary}</div>
-        </Card>
-
-        {/* Position Summaries */}
-        {strategy.positionSummaries&&<Card>
-          <div style={{fontSize:14,fontWeight:700,color:C.blue,marginBottom:10}}>Position Status</div>
-          {strategy.positionSummaries.map((ps,i)=><div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:i<strategy.positionSummaries.length-1?"1px solid "+C.bdrL:"none"}}>
-            <div>
-              <div style={{fontSize:13,fontWeight:600}}>{ps.name}</div>
-              <div style={{fontSize:12,color:C.t2,marginTop:1}}>{ps.status}</div>
-            </div>
-            <span style={{fontSize:10,fontWeight:700,color:ps.priority==="HIGH"?C.red:ps.priority==="MEDIUM"?C.org:C.t3,textTransform:"uppercase"}}>{ps.priority}</span>
-          </div>)}
-        </Card>}
-
-        {/* Actions */}
-        {strategy.actions?.length>0&&<Card>
-          <div style={{fontSize:14,fontWeight:700,color:C.blue,marginBottom:12}}>Recommended Actions</div>
-          {strategy.actions.map((a,i)=>{
-            const urg={IMMEDIATE:C.red,THIS_WEEK:C.org,MONITOR:C.blueA};
-            return <div key={i} style={{border:"1px solid "+(a.urgency==="IMMEDIATE"?C.red+"40":a.urgency==="THIS_WEEK"?C.org+"30":C.bdr),borderRadius:4,padding:14,marginBottom:8,background:a.urgency==="IMMEDIATE"?C.redBg:a.urgency==="THIS_WEEK"?C.orgBg:C.bgS}}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
-                <span style={{fontSize:13,fontWeight:700,color:C.txt}}>{a.type.replace(/_/g," ")}</span>
-                <span style={{fontSize:10,fontWeight:700,color:urg[a.urgency]||C.t3,textTransform:"uppercase"}}>{a.urgency.replace(/_/g," ")}</span>
-              </div>
-              <div style={{fontSize:12,color:C.t3,marginBottom:6}}>{a.position}</div>
-              {/* Specific numbers */}
-              <div style={{display:"flex",gap:12,flexWrap:"wrap",marginBottom:8}}>
-                {a.turboPrice!=null&&<div style={{background:C.w,borderRadius:4,padding:"4px 10px",border:"1px solid "+C.bdrL,fontSize:12,fontFamily:mono}}>Price: <b>€{a.turboPrice}</b></div>}
-                {a.quantity!=null&&<div style={{background:C.w,borderRadius:4,padding:"4px 10px",border:"1px solid "+C.bdrL,fontSize:12,fontFamily:mono}}>Qty: <b>{a.quantity}</b></div>}
-                {a.profitOrLoss!=null&&<div style={{background:C.w,borderRadius:4,padding:"4px 10px",border:"1px solid "+C.bdrL,fontSize:12,fontFamily:mono,color:a.profitOrLoss>=0?C.grn:C.red}}>P&L: <b>{fS(a.profitOrLoss)}</b></div>}
-              </div>
-              <div style={{fontSize:12,color:C.t2,lineHeight:1.6}}>{a.reasoning}</div>
-            </div>;
-          })}
-        </Card>}
-
-        {/* Risks & Outlook */}
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
-          {strategy.keyRisks&&<Card>
-            <div style={{fontSize:13,fontWeight:700,color:C.blue,marginBottom:8}}>Key Risks</div>
-            {strategy.keyRisks.map((r,i)=><div key={i} style={{fontSize:12,color:C.t2,lineHeight:1.5,padding:"6px 0",borderBottom:i<strategy.keyRisks.length-1?"1px solid "+C.bdrL:"none"}}>{r}</div>)}
-          </Card>}
-          {strategy.outlook&&<Card>
-            <div style={{fontSize:13,fontWeight:700,color:C.blue,marginBottom:8}}>Outlook</div>
-            <div style={{fontSize:12,color:C.t2,lineHeight:1.6}}>{strategy.outlook}</div>
-          </Card>}
-        </div>
-      </>}
-
-      {!strategy&&!stratLoad&&<Card style={{textAlign:"center",padding:30}}>
-        <div style={{fontSize:15,fontWeight:600,color:C.blue,marginBottom:6}}>No analysis available</div>
-        <div style={{fontSize:13,color:C.t3,maxWidth:360,margin:"0 auto",lineHeight:1.5}}>Upload a DEGIRO screenshot or click "Run Analysis" to generate strategy recommendations.</div>
-      </Card>}
-    </>}
-
-    {/* ═══ CHARTS ═══ */}
-    {tab==="charts"&&<>
-      <div style={{display:"flex",gap:1,marginBottom:14,borderBottom:"1px solid "+C.bdr}}>
-        {[{k:"pnl",l:"P&L"},{k:"value",l:"Value"},{k:"buffer",l:"Buffer"}].map(c=><button key={c.k} onClick={()=>setChartV(c.k)} style={{background:"none",border:"none",borderBottom:chartV===c.k?"2px solid "+C.blueA:"2px solid transparent",color:chartV===c.k?C.blueA:C.t3,padding:"10px 18px",fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>{c.l}</button>)}
-      </div>
-      {snaps.length<2?<Card style={{textAlign:"center",padding:28}}><div style={{fontSize:14,fontWeight:600,color:C.blue}}>Insufficient data</div><div style={{fontSize:12,color:C.t3,marginTop:4}}>Upload screenshots on different days to build chart history.</div></Card>:<>
-        {chartV==="pnl"&&<Card><div style={{fontSize:14,fontWeight:700,color:C.blue,marginBottom:3}}>P&L History</div><div style={{fontSize:11,color:C.t3,marginBottom:14}}>Unrealized and daily P&L over time</div><Chart data={pnlD} keys={["Unrealized","Daily"]} colors={[C.blueA,"#7C3AED"]} zero unit="€"/></Card>}
-        {chartV==="value"&&<Card><div style={{fontSize:14,fontWeight:700,color:C.blue,marginBottom:3}}>Portfolio Value</div><div style={{fontSize:11,color:C.t3,marginBottom:14}}>Total mark-to-market</div><Chart data={pnlD} keys={["Value"]} colors={[C.grn]} unit="€"/></Card>}
-        {chartV==="buffer"&&<Card><div style={{fontSize:14,fontWeight:700,color:C.blue,marginBottom:3}}>Buffer History</div><div style={{fontSize:11,color:C.t3,marginBottom:14}}>Distance to knock-out per position</div><Chart data={bfD} keys={bfN} colors={[C.blueA,"#7C3AED"]} unit="%" refs={[{y:8,c:C.red,l:"8%"},{y:15,c:C.org,l:"15%"},{y:25,c:C.grn,l:"25%"}]}/></Card>}
-      </>}
-    </>}
-
-    {/* ═══ EVENTS ═══ */}
-    {tab==="events"&&<>
-      <Card>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
-          <div style={{fontSize:15,fontWeight:700,color:C.blue}}>Event Calendar</div>
-          <div style={{display:"flex",gap:6}}>
-            <Btn v="sec" onClick={()=>{if(!apiKey)return show("Set API key in Strategy tab");show("Refreshing events...");
-              fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json","x-api-key":apiKey,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
-                body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:2000,
-                  messages:[{role:"user",content:`Update the historical data for these financial events. For each, provide the last known figure/decision and its market impact. Today is ${tod()}.
-
-Events: ${JSON.stringify(events.map(e=>({id:e.id,title:e.title,date:e.date,type:e.type})))}
-
-JSON only, no markdown: [{"id":"...","lastFigure":"...","marketImpact":"..."}]`}]})
-              }).then(r=>r.json()).then(d=>{
-                if(d.error)return show(d.error.message);
-                const updates=JSON.parse(d.content.map(c=>c.text||"").join("").replace(/```json|```/g,"").trim());
-                setEvents(es=>es.map(ev=>{const u=updates.find(x=>x.id===ev.id);return u?{...ev,lastFigure:u.lastFigure,marketImpact:u.marketImpact}:ev;}));
-                show("Events updated");
-              }).catch(e=>show(e.message));
-            }}>Refresh Data</Btn>
-            <Btn onClick={()=>setShowAddEv(true)}>Add Event</Btn>
-          </div>
-        </div>
-        {[...events].sort((a,b)=>new Date(a.date)-new Date(b.date)).map(ev=>{
-          const d=dTo(ev.date),past=d<0;
-          return <div key={ev.id} style={{padding:"14px 0",borderBottom:"1px solid "+C.bdrL,opacity:past?.35:1}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:ev.lastFigure?6:0}}>
-              <div>
-                <div style={{fontSize:14,fontWeight:600}}>{ev.title}</div>
-                <div style={{fontSize:11,color:C.t3}}>{ev.date} — {ev.type} — {ev.impact} impact</div>
-              </div>
-              <div style={{display:"flex",gap:6,alignItems:"center"}}>
-                <span style={{fontSize:11,fontWeight:700,color:past?C.t3:d<=2?C.red:d<=7?C.org:C.t3,fontFamily:mono}}>{past?"PAST":d===0?"TODAY":d===1?"TMR":d+"d"}</span>
-                <button onClick={()=>setEvents(es=>es.filter(x=>x.id!==ev.id))} style={{background:"none",border:"none",color:C.t4,cursor:"pointer",fontSize:14}}>×</button>
-              </div>
-            </div>
-            {ev.lastFigure&&<div style={{background:C.bgS,borderRadius:4,padding:"8px 12px",marginTop:6,border:"1px solid "+C.bdrL}}>
-              <div style={{fontSize:12,color:C.txt,lineHeight:1.5}}><span style={{fontWeight:600}}>Last:</span> {ev.lastFigure}</div>
-              {ev.marketImpact&&<div style={{fontSize:11,color:C.t2,lineHeight:1.5,marginTop:3}}><span style={{fontWeight:600}}>Impact:</span> {ev.marketImpact}</div>}
-            </div>}
-          </div>;
-        })}
-      </Card>
-      {showAddEv&&<div style={{position:"fixed",inset:0,background:"rgba(26,26,46,.4)",backdropFilter:"blur(3px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:100,padding:16}} onClick={()=>setShowAddEv(false)}>
-        <Card style={{maxWidth:380,width:"100%",boxShadow:"0 8px 30px rgba(0,0,0,.12)"}} onClick={e=>e.stopPropagation()}>
-          <EvForm onSave={ev=>{setEvents(es=>[...es,{...ev,id:"e_"+Date.now()}]);setShowAddEv(false);}} onCancel={()=>setShowAddEv(false)}/>
-        </Card>
       </div>}
     </>}
 
-    <div style={{textAlign:"center",padding:"20px 0 10px",fontSize:10,color:C.t4}}>Data stored in browser. Always verify with DEGIRO.</div>
+    {/* STOCKS */}
+    {tab==="stocks"&&<StocksTab T={T} pos={pos} ideas={D_IDEAS} onSelect={openStock}/>}
+
+    {/* STRATEGY */}
+    {tab==="strategy"&&<StrategyTab T={T} strategy={strategy} stratLoad={stratLoad} apiKey={apiKey} cash={cash} onAnalyze={()=>{if(!apiKey)return show("Set API key");setStratLoad(true);runStrategy(pos,events,cash,apiKey,(e,r)=>{setStratLoad(false);if(e)show(e);else{setStrat(r);show("Analysis complete");}});}}/>}
+
+    {/* EVENTS */}
+    {tab==="events"&&<EventsTab T={T} events={events} setEvents={setEvents} evLoad={evLoad} onRefresh={refreshEv}/>}
+
+    </div>
+
+    {/* BOTTOM NAV */}
+    <div style={{position:"fixed",bottom:0,left:0,right:0,background:T.card,borderTop:"1px solid "+T.border,zIndex:50,paddingBottom:"env(safe-area-inset-bottom)"}}>
+      <div style={{maxWidth:780,margin:"0 auto",display:"grid",gridTemplateColumns:"repeat(4,1fr)"}}>
+        {tabs.map(t=><button key={t.k} onClick={()=>setTab(t.k)} style={{padding:"12px 4px 14px",color:tab===t.k?T.blueA:T.txt3,fontWeight:tab===t.k?700:500,fontSize:12,borderTop:tab===t.k?"2px solid "+T.blueA:"2px solid transparent",marginTop:-1}}>{t.l}</button>)}
+      </div>
     </div>
   </div>;
 }
 
-function EvForm({onSave,onCancel}){
-  const [f,setF]=useState({title:"",date:"",type:"macro",impact:"high",lastFigure:"",marketImpact:""});
-  return <><div style={{fontSize:16,fontWeight:700,color:C.blue,marginBottom:12}}>New Event</div>
-    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-      <Inp label="Name" value={f.title} onChange={e=>setF(p=>({...p,title:e.target.value}))}/><Inp label="Date" type="date" value={f.date} onChange={e=>setF(p=>({...p,date:e.target.value}))}/>
-      <Sel label="Type" value={f.type} onChange={e=>setF(p=>({...p,type:e.target.value}))}><option value="macro">Macro</option><option value="earnings">Earnings</option><option value="other">Other</option></Sel>
-      <Sel label="Impact" value={f.impact} onChange={e=>setF(p=>({...p,impact:e.target.value}))}><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></Sel>
+// ══════════ STOCKS TAB ══════════
+function StocksTab({T,pos,ideas,onSelect}){
+  const owned=pos.map(p=>{
+    const t=p.ticker||"?";
+    const baseName=p.underlying.split(" (")[0];
+    return {ticker:t,name:baseName,underlying:p.underlying,sector:t.includes("MU")||t.includes("NVDA")||t.includes("ASML")?"Semiconductors":t.includes("HO")||t.includes("RHM")?"Defense":t.includes("BNP")?"Financials":"Other",isOwned:true,positionValue:pV(p)};
+  });
+  const filteredIdeas=ideas.filter(i=>!owned.find(o=>o.ticker===i.ticker));
+
+  return <>
+    {/* OWNED */}
+    {owned.length>0&&<div style={{marginBottom:18}}>
+      <div style={{fontSize:11,fontWeight:600,color:T.txt3,textTransform:"uppercase",letterSpacing:".06em",marginBottom:8,paddingLeft:4}}>Stocks I Own</div>
+      {owned.map(s=><div key={s.ticker} onClick={()=>onSelect(s)} style={{background:T.card,borderRadius:10,padding:"14px 16px",marginBottom:7,border:"1px solid "+T.border,cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <div>
+          <div style={{fontSize:14,fontWeight:600,color:T.txt}}>{s.name}</div>
+          <div style={{fontSize:11,color:T.txt3,marginTop:1}}>{s.ticker} · {s.sector}</div>
+        </div>
+        <div style={{textAlign:"right"}}>
+          <div style={{fontSize:13,fontWeight:600,color:T.txt}} className="mono">{fE(s.positionValue)}</div>
+          <div style={{fontSize:11,color:T.blueA,marginTop:1}}>View →</div>
+        </div>
+      </div>)}
+    </div>}
+
+    {/* IDEAS */}
+    {filteredIdeas.length>0&&<div>
+      <div style={{fontSize:11,fontWeight:600,color:T.txt3,textTransform:"uppercase",letterSpacing:".06em",marginBottom:8,paddingLeft:4}}>Ideas</div>
+      {filteredIdeas.map(s=><div key={s.ticker} onClick={()=>onSelect(s)} style={{background:T.card,borderRadius:10,padding:"14px 16px",marginBottom:7,border:"1px solid "+T.border,cursor:"pointer"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:6}}>
+          <div>
+            <div style={{fontSize:14,fontWeight:600,color:T.txt}}>{s.name}</div>
+            <div style={{fontSize:11,color:T.txt3,marginTop:1}}>{s.ticker} · {s.sector}</div>
+          </div>
+          <div style={{fontSize:10,fontWeight:700,color:T.blueA,background:T.blueT,padding:"2px 8px",borderRadius:4,whiteSpace:"nowrap"}}>{s.turboType} {s.suggestedLev}</div>
+        </div>
+        <div style={{fontSize:12,color:T.txt2,lineHeight:1.4}}>{s.thesis}</div>
+        <div style={{fontSize:11,color:T.blueA,marginTop:6}}>View details →</div>
+      </div>)}
+    </div>}
+
+    {owned.length===0&&filteredIdeas.length===0&&<div style={{textAlign:"center",padding:30,color:T.txt3}}>No stocks tracked yet.</div>}
+  </>;
+}
+
+// ══════════ STOCK DETAIL PAGE ══════════
+function StockDetailPage({T,stock,loading,onClose,onRefresh}){
+  return <div style={{position:"fixed",inset:0,background:T.bg,zIndex:200,overflowY:"auto"}} className="slideIn scroll">
+    <div style={{background:T.headerBg,color:T.headerTxt,padding:"14px 16px",position:"sticky",top:0,zIndex:10}}>
+      <div style={{maxWidth:780,margin:"0 auto",display:"flex",alignItems:"center",gap:12}}>
+        <button onClick={onClose} style={{color:T.headerTxt,fontSize:22,padding:"4px 6px"}}>‹</button>
+        <div style={{flex:1}}>
+          <div style={{fontSize:16,fontWeight:700}}>{stock.name}</div>
+          <div style={{fontSize:11,opacity:.6}}>{stock.ticker} · {stock.sector}</div>
+        </div>
+        {!loading&&!stock.loading&&<button onClick={onRefresh} style={{color:T.headerTxt,fontSize:12,padding:"5px 10px",background:"rgba(255,255,255,.12)",borderRadius:6}}>Refresh</button>}
+      </div>
     </div>
-    <Inp label="Last figure / decision (optional)" value={f.lastFigure} onChange={e=>setF(p=>({...p,lastFigure:e.target.value}))}/>
-    <Inp label="Market impact (optional)" value={f.marketImpact} onChange={e=>setF(p=>({...p,marketImpact:e.target.value}))}/>
-    <div style={{display:"flex",gap:8,marginTop:4}}><Btn onClick={()=>{if(f.title&&f.date)onSave(f);}}>Save</Btn><Btn v="ghost" onClick={onCancel}>Cancel</Btn></div></>;
+
+    <div style={{maxWidth:780,margin:"0 auto",padding:"16px 14px",paddingBottom:40}}>
+      {(loading||stock.loading)&&<div style={{textAlign:"center",padding:60}} className="anim"><div style={{color:T.blueA,fontWeight:600,fontSize:14}}>Loading {stock.name} data...</div><div style={{fontSize:11,color:T.txt3,marginTop:6}}>Searching latest information</div></div>}
+
+      {stock.error&&<div style={{background:T.redBg,color:T.red,borderRadius:8,padding:14,fontSize:13}}>{stock.error}</div>}
+
+      {!loading&&!stock.loading&&stock.currentPrice&&<>
+        {/* PRICE HEADER */}
+        <div style={{background:T.card,borderRadius:10,padding:"16px 18px",marginBottom:11,border:"1px solid "+T.border}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline"}}>
+            <div>
+              <div style={{fontSize:28,fontWeight:700,color:T.txt,letterSpacing:"-.02em"}} className="mono">{stock.currency==="USD"?"$":"€"}{stock.currentPrice?.toFixed(2)}</div>
+              <div style={{fontSize:13,fontWeight:600,color:stock.dailyChange>=0?T.grn:T.red,marginTop:1}} className="mono">{fS(stock.dailyChange||0)} ({fP(stock.dailyChangePct||0)})</div>
+            </div>
+            <div style={{textAlign:"right",fontSize:11,color:T.txt3}}>
+              <div>52W H: <span style={{color:T.txt2}}>{stock.yearHigh52?.toFixed(0)}</span></div>
+              <div>52W L: <span style={{color:T.txt2}}>{stock.yearLow52?.toFixed(0)}</span></div>
+            </div>
+          </div>
+        </div>
+
+        {/* KEY METRICS */}
+        <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:6,marginBottom:11}}>
+          {[{l:"Market Cap",v:stock.marketCap},{l:"P/E",v:stock.peRatio?.toFixed(2)},{l:"Fwd P/E",v:stock.fwdPe?.toFixed(2)},{l:"EBITDA Margin",v:stock.ebitdaMargin}].map((m,i)=>m.v?<div key={i} style={{background:T.card,borderRadius:8,padding:"10px 12px",border:"1px solid "+T.border}}>
+            <div style={{fontSize:10,color:T.txt3,textTransform:"uppercase",letterSpacing:".05em",fontWeight:600,marginBottom:2}}>{m.l}</div>
+            <div style={{fontSize:14,fontWeight:700,color:T.txt}} className="mono">{m.v}</div>
+          </div>:null)}
+        </div>
+
+        {/* COMPANY */}
+        {stock.description&&<Section T={T} title="About">
+          <div style={{fontSize:13,color:T.txt2,lineHeight:1.55}}>{stock.description}</div>
+        </Section>}
+
+        {/* BUSINESS LINES */}
+        {stock.businessLines?.length>0&&<Section T={T} title="Business Lines">
+          {stock.businessLines.map((bl,i)=><div key={i} style={{padding:"9px 0",borderBottom:i<stock.businessLines.length-1?"1px solid "+T.borderL:"none"}}>
+            <div style={{display:"flex",justifyContent:"space-between",marginBottom:2}}>
+              <span style={{fontSize:13,fontWeight:600,color:T.txt}}>{bl.name}</span>
+              {bl.revenuePct&&<span style={{fontSize:11,fontWeight:700,color:T.blueA}} className="mono">{bl.revenuePct}</span>}
+            </div>
+            <div style={{fontSize:12,color:T.txt2,lineHeight:1.4}}>{bl.description}</div>
+          </div>)}
+        </Section>}
+
+        {/* ANALYST */}
+        {stock.analystTargets&&<Section T={T} title="Analyst Targets">
+          <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:6,marginBottom:10}}>
+            {[{l:"Avg",v:stock.analystTargets.average},{l:"High",v:stock.analystTargets.high},{l:"Low",v:stock.analystTargets.low}].map((m,i)=><div key={i} style={{background:T.inputBg,borderRadius:7,padding:"8px 10px",border:"1px solid "+T.borderL,textAlign:"center"}}>
+              <div style={{fontSize:9,color:T.txt3,textTransform:"uppercase",fontWeight:600}}>{m.l}</div>
+              <div style={{fontSize:14,fontWeight:700,color:T.txt}} className="mono">{stock.currency==="USD"?"$":"€"}{m.v?.toFixed(0)}</div>
+            </div>)}
+          </div>
+          <div style={{fontSize:13,color:T.txt2}}>Rating: <b style={{color:stock.analystTargets.rating==="Buy"?T.grn:stock.analystTargets.rating==="Sell"?T.red:T.org}}>{stock.analystTargets.rating}</b> · {stock.analystTargets.buyCount||0} Buy / {stock.analystTargets.holdCount||0} Hold / {stock.analystTargets.sellCount||0} Sell</div>
+          {stock.analystTargets.upside&&<div style={{fontSize:12,color:T.blueA,fontWeight:600,marginTop:4}}>Upside: {stock.analystTargets.upside}</div>}
+        </Section>}
+
+        {/* EARNINGS */}
+        {stock.earnings&&<Section T={T} title="Earnings">
+          {stock.earnings.lastQuarter&&<div style={{paddingBottom:10,borderBottom:"1px solid "+T.borderL,marginBottom:10}}>
+            <div style={{fontSize:11,color:T.txt3,fontWeight:600,marginBottom:3}}>Last Quarter ({stock.earnings.lastQuarter.date})</div>
+            <div style={{fontSize:13,color:T.txt2}}>Revenue: <b>{stock.earnings.lastQuarter.revenue}</b></div>
+            {stock.earnings.lastQuarter.epsActual&&<div style={{fontSize:13,color:T.txt2}}>EPS: <b>{stock.earnings.lastQuarter.epsActual}</b> {stock.earnings.lastQuarter.epsEstimate&&<span style={{color:T.txt3}}>vs est {stock.earnings.lastQuarter.epsEstimate}</span>}</div>}
+            {stock.earnings.lastQuarter.surprise&&<div style={{fontSize:12,color:T.txt3,marginTop:2}}>{stock.earnings.lastQuarter.surprise}</div>}
+          </div>}
+          {stock.earnings.nextDate&&<>
+            <div style={{fontSize:11,color:T.txt3,fontWeight:600,marginBottom:3}}>Next Earnings: {stock.earnings.nextDate}</div>
+            {stock.earnings.consensus&&<div style={{fontSize:13,color:T.txt2,lineHeight:1.5}}>{stock.earnings.consensus}</div>}
+          </>}
+        </Section>}
+
+        {/* NEWS */}
+        {stock.latestNews?.length>0&&<Section T={T} title="Latest News">
+          {stock.latestNews.map((n,i)=><div key={i} style={{padding:"9px 0",borderBottom:i<stock.latestNews.length-1?"1px solid "+T.borderL:"none"}}>
+            <div style={{fontSize:13,fontWeight:600,color:T.txt,marginBottom:2}}>{n.headline}</div>
+            <div style={{fontSize:11,color:T.txt3,marginBottom:3}}>{n.date}</div>
+            <div style={{fontSize:12,color:T.txt2,lineHeight:1.4}}>{n.summary}</div>
+          </div>)}
+        </Section>}
+
+        {/* RISKS */}
+        {stock.risks?.length>0&&<Section T={T} title="Key Risks">
+          {stock.risks.map((r,i)=><div key={i} style={{padding:"10px 0",borderBottom:i<stock.risks.length-1?"1px solid "+T.borderL:"none"}}>
+            <div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}>
+              <span style={{fontSize:13,fontWeight:600,color:T.txt}}>{r.event}</span>
+              <span style={{fontSize:9,fontWeight:700,color:T.org,background:T.orgBg,padding:"2px 7px",borderRadius:4,textTransform:"uppercase"}}>{r.category}</span>
+            </div>
+            <div style={{fontSize:12,color:T.txt2,lineHeight:1.5}}>{r.impact}</div>
+          </div>)}
+        </Section>}
+      </>}
+    </div>
+  </div>;
+}
+
+const Section=({T,title,children})=><div style={{background:T.card,borderRadius:10,padding:"14px 16px",marginBottom:11,border:"1px solid "+T.border}}>
+  <div style={{fontSize:13,fontWeight:700,color:T.txt,marginBottom:10}}>{title}</div>
+  {children}
+</div>;
+
+// ══════════ STRATEGY TAB ══════════
+function StrategyTab({T,strategy,stratLoad,apiKey,cash,onAnalyze}){
+  if(!apiKey)return <div style={{background:T.card,borderRadius:10,padding:30,textAlign:"center",border:"1px solid "+T.border}}>
+    <div style={{fontSize:14,fontWeight:600,color:T.txt}}>API Key Required</div>
+    <div style={{fontSize:12,color:T.txt3,marginTop:5}}>Set your Anthropic API key in Settings</div>
+  </div>;
+
+  return <>
+    <button onClick={onAnalyze} disabled={stratLoad} style={{width:"100%",background:T.blueA,color:"#fff",padding:"11px 18px",borderRadius:8,fontSize:14,fontWeight:600,marginBottom:11}}>{stratLoad?"Analyzing...":"Run Analysis"}</button>
+
+    {stratLoad&&<div style={{background:T.card,borderRadius:10,padding:30,textAlign:"center",border:"1px solid "+T.border}} className="anim">
+      <div style={{color:T.blueA,fontWeight:600}}>Analyzing portfolio and market conditions...</div>
+    </div>}
+
+    {strategy&&!stratLoad&&<>
+      <div style={{background:T.card,borderRadius:10,padding:"14px 16px",marginBottom:11,border:"1px solid "+T.border}}>
+        <div style={{display:"flex",justifyContent:"space-between",marginBottom:7}}>
+          <span style={{fontSize:14,fontWeight:700,color:T.txt}}>Assessment</span>
+          <span style={{fontSize:10,fontWeight:700,color:strategy.riskLevel==="LOW"?T.grn:strategy.riskLevel==="MODERATE"?T.blueA:strategy.riskLevel==="ELEVATED"?T.org:T.red,textTransform:"uppercase"}}>{strategy.riskLevel} RISK</span>
+        </div>
+        <div style={{fontSize:13,color:T.txt2,lineHeight:1.55}}>{strategy.summary}</div>
+      </div>
+
+      {/* RULE VIOLATIONS */}
+      {strategy.ruleViolations?.length>0&&<div style={{background:T.card,borderRadius:10,padding:"14px 16px",marginBottom:11,border:"1px solid "+T.border}}>
+        <div style={{fontSize:13,fontWeight:700,color:T.txt,marginBottom:8}}>Trading Rules</div>
+        {strategy.ruleViolations.map((rv,i)=><div key={i} style={{background:rv.severity==="HARD"?T.redBg:T.orgBg,padding:"8px 11px",borderRadius:7,marginBottom:5}}>
+          <div style={{fontSize:12,fontWeight:700,color:rv.severity==="HARD"?T.red:T.org,marginBottom:2}}>{rv.severity==="HARD"?"BLOCKED":"WARNING"} — {rv.rule}</div>
+          <div style={{fontSize:12,color:T.txt2}}>{rv.details}</div>
+        </div>)}
+      </div>}
+
+      {/* CASH DEPLOYMENT */}
+      {strategy.cashDeployment&&<div style={{background:T.card,borderRadius:10,padding:"14px 16px",marginBottom:11,border:"1px solid "+T.border}}>
+        <div style={{fontSize:13,fontWeight:700,color:T.txt,marginBottom:3}}>Cash Deployment</div>
+        <div style={{fontSize:12,color:T.txt3,marginBottom:10}}>{fE(strategy.cashDeployment.available)} available in Espace Libre</div>
+        {(strategy.cashDeployment.suggestions||[]).map((s,i)=><div key={i} style={{background:T.blueT,padding:"10px 12px",borderRadius:7,marginBottom:6,border:"1px solid "+T.border}}>
+          <div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}>
+            <span style={{fontSize:13,fontWeight:700,color:T.txt}}>{s.name} ({s.ticker})</span>
+            <span style={{fontSize:12,fontWeight:700,color:T.blueA}} className="mono">{fE(s.amount)} · {s.leverage}</span>
+          </div>
+          <div style={{fontSize:12,color:T.txt2,lineHeight:1.4}}>{s.reasoning}</div>
+        </div>)}
+      </div>}
+
+      {/* POSITION STATUS */}
+      {strategy.positionSummaries?.length>0&&<div style={{background:T.card,borderRadius:10,padding:"14px 16px",marginBottom:11,border:"1px solid "+T.border}}>
+        <div style={{fontSize:13,fontWeight:700,color:T.txt,marginBottom:8}}>Position Status</div>
+        {strategy.positionSummaries.map((ps,i)=><div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"9px 0",borderBottom:i<strategy.positionSummaries.length-1?"1px solid "+T.borderL:"none"}}>
+          <div style={{flex:1,marginRight:10}}>
+            <div style={{fontSize:13,fontWeight:600,color:T.txt}}>{ps.name}</div>
+            <div style={{fontSize:11,color:T.txt2,marginTop:1,lineHeight:1.4}}>{ps.status}</div>
+          </div>
+          <span style={{fontSize:9,fontWeight:700,color:ps.priority==="HIGH"?T.red:ps.priority==="MEDIUM"?T.org:T.txt3,textTransform:"uppercase",whiteSpace:"nowrap"}}>{ps.priority}</span>
+        </div>)}
+      </div>}
+
+      {/* ACTIONS */}
+      {strategy.actions?.length>0&&<div style={{background:T.card,borderRadius:10,padding:"14px 16px",marginBottom:11,border:"1px solid "+T.border}}>
+        <div style={{fontSize:13,fontWeight:700,color:T.txt,marginBottom:10}}>Recommended Actions</div>
+        {strategy.actions.map((a,i)=>{const u={IMMEDIATE:T.red,THIS_WEEK:T.org,MONITOR:T.blueA};
+          return <div key={i} style={{border:"1px solid "+(a.urgency==="IMMEDIATE"?T.red+"40":a.urgency==="THIS_WEEK"?T.org+"40":T.border),borderRadius:8,padding:12,marginBottom:7,background:a.urgency==="IMMEDIATE"?T.redBg:a.urgency==="THIS_WEEK"?T.orgBg:T.inputBg}}>
+            <div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}>
+              <span style={{fontSize:12,fontWeight:700,color:T.txt}}>{a.type.replace(/_/g," ")}</span>
+              <span style={{fontSize:9,fontWeight:700,color:u[a.urgency]||T.txt3,textTransform:"uppercase"}}>{a.urgency.replace(/_/g," ")}</span>
+            </div>
+            <div style={{fontSize:11,color:T.txt3,marginBottom:5}}>{a.position}</div>
+            <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:6}}>
+              {a.turboPrice!=null&&<span style={{background:T.card,borderRadius:5,padding:"3px 8px",border:"1px solid "+T.borderL,fontSize:11}} className="mono">Price €{a.turboPrice}</span>}
+              {a.quantity!=null&&<span style={{background:T.card,borderRadius:5,padding:"3px 8px",border:"1px solid "+T.borderL,fontSize:11}} className="mono">Qty {a.quantity}</span>}
+              {a.profitOrLoss!=null&&<span style={{background:T.card,borderRadius:5,padding:"3px 8px",border:"1px solid "+T.borderL,fontSize:11,color:a.profitOrLoss>=0?T.grn:T.red}} className="mono">P&L {fS(a.profitOrLoss)}</span>}
+              {a.amount!=null&&<span style={{background:T.card,borderRadius:5,padding:"3px 8px",border:"1px solid "+T.borderL,fontSize:11}} className="mono">€{a.amount}</span>}
+            </div>
+            <div style={{fontSize:12,color:T.txt2,lineHeight:1.5}}>{a.reasoning}</div>
+          </div>;
+        })}
+      </div>}
+
+      <div style={{display:"grid",gridTemplateColumns:"1fr",gap:8}}>
+        {strategy.keyRisks&&<div style={{background:T.card,borderRadius:10,padding:"14px 16px",border:"1px solid "+T.border}}>
+          <div style={{fontSize:13,fontWeight:700,color:T.txt,marginBottom:7}}>Key Risks</div>
+          {strategy.keyRisks.map((r,i)=><div key={i} style={{fontSize:12,color:T.txt2,lineHeight:1.45,padding:"5px 0",borderBottom:i<strategy.keyRisks.length-1?"1px solid "+T.borderL:"none"}}>{r}</div>)}
+        </div>}
+        {strategy.outlook&&<div style={{background:T.card,borderRadius:10,padding:"14px 16px",border:"1px solid "+T.border}}>
+          <div style={{fontSize:13,fontWeight:700,color:T.txt,marginBottom:7}}>Outlook</div>
+          <div style={{fontSize:12,color:T.txt2,lineHeight:1.55}}>{strategy.outlook}</div>
+        </div>}
+      </div>
+    </>}
+
+    {!strategy&&!stratLoad&&<div style={{background:T.card,borderRadius:10,padding:30,textAlign:"center",border:"1px solid "+T.border}}>
+      <div style={{fontSize:14,fontWeight:600,color:T.txt}}>No analysis yet</div>
+      <div style={{fontSize:12,color:T.txt3,marginTop:5}}>Tap "Run Analysis" or upload a screenshot to start.</div>
+    </div>}
+  </>;
+}
+
+// ══════════ EVENTS TAB ══════════
+function EventsTab({T,events,setEvents,evLoad,onRefresh}){
+  return <>
+    <div style={{display:"flex",gap:8,marginBottom:11}}>
+      <button onClick={onRefresh} disabled={evLoad} style={{flex:1,background:T.blueL,color:T.blueA,padding:"10px 14px",borderRadius:7,fontSize:13,fontWeight:600}}>{evLoad?"Refreshing...":"Refresh Data"}</button>
+    </div>
+    <div style={{background:T.card,borderRadius:10,padding:"4px 16px",border:"1px solid "+T.border}}>
+      {[...events].sort((a,b)=>new Date(a.date)-new Date(b.date)).map((ev,i)=>{
+        const d=dTo(ev.date),past=d<0;
+        return <div key={ev.id} style={{padding:"14px 0",borderBottom:i<events.length-1?"1px solid "+T.borderL:"none",opacity:past?.4:1}}>
+          <div style={{display:"flex",justifyContent:"space-between",marginBottom:ev.lastFigure?7:0}}>
+            <div>
+              <div style={{fontSize:14,fontWeight:600,color:T.txt}}>{ev.title}</div>
+              <div style={{fontSize:11,color:T.txt3}}>{ev.date} · {ev.type}</div>
+            </div>
+            <span style={{fontSize:11,fontWeight:700,color:past?T.txt3:d<=2?T.red:d<=7?T.org:T.txt3}} className="mono">{past?"PAST":d===0?"TODAY":d===1?"TMR":d+"d"}</span>
+          </div>
+          {ev.expectations&&<div style={{background:T.blueT,borderRadius:7,padding:"8px 11px",marginTop:5,border:"1px solid "+T.border}}>
+            <div style={{fontSize:11,color:T.blueA,fontWeight:700,marginBottom:2,textTransform:"uppercase",letterSpacing:".05em"}}>Expectations</div>
+            <div style={{fontSize:12,color:T.txt2,lineHeight:1.45}}>{ev.expectations}</div>
+          </div>}
+          {ev.lastFigure&&<div style={{background:T.inputBg,borderRadius:7,padding:"8px 11px",marginTop:5,border:"1px solid "+T.borderL}}>
+            <div style={{fontSize:12,color:T.txt,lineHeight:1.4}}><b>Last:</b> {ev.lastFigure}</div>
+            {ev.marketImpact&&<div style={{fontSize:11,color:T.txt2,lineHeight:1.4,marginTop:3}}><b>Impact:</b> {ev.marketImpact}</div>}
+          </div>}
+        </div>;
+      })}
+    </div>
+  </>;
+}
+
+// ══════════ SETTINGS ══════════
+function SettingsModal({T,mode,setMode,apiKey,saveApi,onClose}){
+  return <div style={{position:"fixed",inset:0,background:T.modal,backdropFilter:"blur(3px)",display:"flex",alignItems:"flex-end",zIndex:200}} onClick={onClose} className="fadeIn">
+    <div style={{background:T.card,borderRadius:"14px 14px 0 0",width:"100%",maxWidth:480,margin:"0 auto",padding:22}} onClick={e=>e.stopPropagation()} className="slideUp">
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18}}>
+        <div style={{fontSize:17,fontWeight:700,color:T.txt}}>Settings</div>
+        <button onClick={onClose} style={{color:T.txt3,fontSize:24}}>×</button>
+      </div>
+
+      <div style={{marginBottom:18}}>
+        <div style={{fontSize:11,fontWeight:600,color:T.txt3,textTransform:"uppercase",letterSpacing:".06em",marginBottom:6}}>Theme</div>
+        <div style={{display:"flex",background:T.inputBg,borderRadius:8,padding:3,border:"1px solid "+T.border}}>
+          {[{k:"light",l:"Light"},{k:"dark",l:"Dark"}].map(t=><button key={t.k} onClick={()=>setMode(t.k)} style={{flex:1,padding:"8px 12px",borderRadius:6,fontSize:13,fontWeight:600,background:mode===t.k?T.card:"transparent",color:mode===t.k?T.txt:T.txt3,boxShadow:mode===t.k?T.sh:"none"}}>{t.l}</button>)}
+        </div>
+      </div>
+
+      <div style={{marginBottom:18}}>
+        <div style={{fontSize:11,fontWeight:600,color:T.txt3,textTransform:"uppercase",letterSpacing:".06em",marginBottom:6}}>Anthropic API Key</div>
+        <input type="password" value={apiKey} onChange={e=>saveApi(e.target.value)} placeholder="sk-ant-..." className="mono" style={{width:"100%",padding:"10px 12px",background:T.inputBg,border:"1px solid "+T.inputBdr,borderRadius:7,color:T.txt,fontSize:13}}/>
+        <div style={{fontSize:11,color:T.txt3,marginTop:4}}>Stored locally. Never shared.</div>
+      </div>
+
+      <div>
+        <div style={{fontSize:11,fontWeight:600,color:T.txt3,textTransform:"uppercase",letterSpacing:".06em",marginBottom:6}}>Trading Rules</div>
+        <div style={{background:T.inputBg,borderRadius:7,padding:12,border:"1px solid "+T.border,fontSize:12,color:T.txt2,lineHeight:1.7}}>
+          • Max position weight: <b>60%</b> (warn) / <b>80%</b> (block)<br/>
+          • Min entry buffer: <b>15%</b> (warn) / <b>8%</b> (block)<br/>
+          • Max leverage: <b>5x</b> (warn) / <b>10x</b> (block)<br/>
+          • Scale-out trigger: <b>+100%</b> unrealized<br/>
+          • Pre-event reduction: <b>7 days</b> before high-impact
+        </div>
+      </div>
+    </div>
+  </div>;
 }
 
 ReactDOM.render(<App/>,document.getElementById("root"));
