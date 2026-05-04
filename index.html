@@ -394,6 +394,24 @@ JSON only: [{"id":"...","lastFigure":"1-2 sentences with numbers","marketImpact"
   }).catch(e=>cb(e.message));
 }
 
+// ══════════ ERROR BOUNDARY ══════════
+class ErrorBoundary extends React.Component{
+  constructor(props){super(props);this.state={hasError:false,err:""};}
+  static getDerivedStateFromError(err){return{hasError:true,err:err.message||String(err)};}
+  componentDidCatch(err,info){console.error("Caught:",err,info);}
+  render(){
+    if(this.state.hasError){
+      return <div style={{padding:24,fontFamily:"system-ui",background:"#fee",color:"#c00",borderRadius:8,margin:16}}>
+        <div style={{fontSize:16,fontWeight:700,marginBottom:8}}>Something broke in this section</div>
+        <div style={{fontSize:13,marginBottom:12,fontFamily:"monospace",background:"#fff",padding:8,borderRadius:4,color:"#600"}}>{this.state.err}</div>
+        <button onClick={()=>this.setState({hasError:false,err:""})} style={{padding:"8px 16px",background:"#c00",color:"#fff",border:"none",borderRadius:6,cursor:"pointer",fontWeight:600}}>Try again</button>
+        <button onClick={()=>{localStorage.removeItem("td10-strat");this.setState({hasError:false,err:""});window.location.reload();}} style={{marginLeft:8,padding:"8px 16px",background:"#fff",color:"#c00",border:"1px solid #c00",borderRadius:6,cursor:"pointer",fontWeight:600}}>Reset & reload</button>
+      </div>;
+    }
+    return this.props.children;
+  }
+}
+
 // ══════════ MAIN APP ══════════
 function App(){
   const [T,mode,setMode]=useTheme();
@@ -639,13 +657,13 @@ function App(){
     </>}
 
     {/* STOCKS */}
-    {tab==="stocks"&&<StocksTab T={T} pos={pos} ideas={D_IDEAS} onSelect={openStock}/>}
+    {tab==="stocks"&&<ErrorBoundary><StocksTab T={T} pos={pos} ideas={D_IDEAS} onSelect={openStock}/></ErrorBoundary>}
 
     {/* STRATEGY */}
-    {tab==="strategy"&&<StrategyTab T={T} strategy={strategy} stratLoad={stratLoad} apiKey={apiKey} cash={cash} onAnalyze={()=>{if(!apiKey)return show("Set API key");setStratLoad(true);runStrategy(pos,events,cash,apiKey,(e,r)=>{setStratLoad(false);if(e)show(e);else{setStrat(r);show("Analysis complete");}});}}/>}
+    {tab==="strategy"&&<ErrorBoundary><StrategyTab T={T} strategy={strategy} stratLoad={stratLoad} apiKey={apiKey} cash={cash} onAnalyze={()=>{if(!apiKey)return show("Set API key");setStratLoad(true);runStrategy(pos,events,cash,apiKey,(e,r)=>{setStratLoad(false);if(e)show(e);else{setStrat(r);show("Analysis complete");}});}}/></ErrorBoundary>}
 
     {/* EVENTS */}
-    {tab==="events"&&<EventsTab T={T} events={events} setEvents={setEvents} evLoad={evLoad} onRefresh={refreshEv}/>}
+    {tab==="events"&&<ErrorBoundary><EventsTab T={T} events={events} setEvents={setEvents} evLoad={evLoad} onRefresh={refreshEv}/></ErrorBoundary>}
 
     </div>
 
@@ -818,99 +836,118 @@ const Section=({T,title,children})=><div style={{background:T.card,borderRadius:
 
 // ══════════ STRATEGY TAB ══════════
 function StrategyTab({T,strategy,stratLoad,apiKey,cash,onAnalyze}){
-  if(!apiKey)return <div style={{background:T.card,borderRadius:10,padding:30,textAlign:"center",border:"1px solid "+T.border}}>
-    <div style={{fontSize:14,fontWeight:600,color:T.txt}}>API Key Required</div>
-    <div style={{fontSize:12,color:T.txt3,marginTop:5}}>Set your Anthropic API key in Settings</div>
-  </div>;
+  if(!apiKey){
+    return <div style={{background:T.card,borderRadius:10,padding:30,textAlign:"center",border:"1px solid "+T.border}}>
+      <div style={{fontSize:14,fontWeight:600,color:T.txt}}>API Key Required</div>
+      <div style={{fontSize:12,color:T.txt3,marginTop:5}}>Set your Anthropic API key in Settings</div>
+    </div>;
+  }
 
-  return <>
-    <button onClick={onAnalyze} disabled={stratLoad} style={{width:"100%",background:T.blueA,color:"#fff",padding:"11px 18px",borderRadius:8,fontSize:14,fontWeight:600,marginBottom:11}}>{stratLoad?"Analyzing...":"Run Analysis"}</button>
+  // Safely extract fields with fallbacks
+  const s=strategy||{};
+  const ruleViolations=Array.isArray(s.ruleViolations)?s.ruleViolations:[];
+  const cashDep=s.cashDeployment&&typeof s.cashDeployment==="object"?s.cashDeployment:null;
+  const cashSugs=cashDep&&Array.isArray(cashDep.suggestions)?cashDep.suggestions:[];
+  const posSummaries=Array.isArray(s.positionSummaries)?s.positionSummaries:[];
+  const actions=Array.isArray(s.actions)?s.actions:[];
+  const keyRisks=Array.isArray(s.keyRisks)?s.keyRisks:[];
+  const safeS=v=>typeof v==="number"?fS(v):"—";
+  const safeE=v=>typeof v==="number"?fE(v):"—";
+
+  return <div>
+    <button onClick={onAnalyze} disabled={stratLoad} style={{width:"100%",background:T.blueA,color:"#fff",padding:"11px 18px",borderRadius:8,fontSize:14,fontWeight:600,marginBottom:11,opacity:stratLoad?0.6:1}}>{stratLoad?"Analyzing...":"Run Analysis"}</button>
 
     {stratLoad&&<div style={{background:T.card,borderRadius:10,padding:30,textAlign:"center",border:"1px solid "+T.border}} className="anim">
       <div style={{color:T.blueA,fontWeight:600}}>Analyzing portfolio and market conditions...</div>
     </div>}
 
-    {strategy&&!stratLoad&&<>
+    {strategy&&!stratLoad&&<div>
+      {/* Assessment */}
       <div style={{background:T.card,borderRadius:10,padding:"14px 16px",marginBottom:11,border:"1px solid "+T.border}}>
         <div style={{display:"flex",justifyContent:"space-between",marginBottom:7}}>
           <span style={{fontSize:14,fontWeight:700,color:T.txt}}>Assessment</span>
-          <span style={{fontSize:10,fontWeight:700,color:strategy.riskLevel==="LOW"?T.grn:strategy.riskLevel==="MODERATE"?T.blueA:strategy.riskLevel==="ELEVATED"?T.org:T.red,textTransform:"uppercase"}}>{strategy.riskLevel} RISK</span>
+          {s.riskLevel&&<span style={{fontSize:10,fontWeight:700,color:s.riskLevel==="LOW"?T.grn:s.riskLevel==="MODERATE"?T.blueA:s.riskLevel==="ELEVATED"?T.org:T.red,textTransform:"uppercase"}}>{s.riskLevel} RISK</span>}
         </div>
-        <div style={{fontSize:13,color:T.txt2,lineHeight:1.55}}>{strategy.summary}</div>
+        {s.summary&&<div style={{fontSize:13,color:T.txt2,lineHeight:1.55}}>{s.summary}</div>}
       </div>
 
-      {/* RULE VIOLATIONS */}
-      {strategy.ruleViolations?.length>0&&<div style={{background:T.card,borderRadius:10,padding:"14px 16px",marginBottom:11,border:"1px solid "+T.border}}>
+      {/* Rule Violations */}
+      {ruleViolations.length>0&&<div style={{background:T.card,borderRadius:10,padding:"14px 16px",marginBottom:11,border:"1px solid "+T.border}}>
         <div style={{fontSize:13,fontWeight:700,color:T.txt,marginBottom:8}}>Trading Rules</div>
-        {strategy.ruleViolations.map((rv,i)=><div key={i} style={{background:rv.severity==="HARD"?T.redBg:T.orgBg,padding:"8px 11px",borderRadius:7,marginBottom:5}}>
-          <div style={{fontSize:12,fontWeight:700,color:rv.severity==="HARD"?T.red:T.org,marginBottom:2}}>{rv.severity==="HARD"?"BLOCKED":"WARNING"} — {rv.rule}</div>
-          <div style={{fontSize:12,color:T.txt2}}>{rv.details}</div>
+        {ruleViolations.map((rv,i)=><div key={i} style={{background:rv.severity==="HARD"?T.redBg:T.orgBg,padding:"8px 11px",borderRadius:7,marginBottom:5}}>
+          <div style={{fontSize:12,fontWeight:700,color:rv.severity==="HARD"?T.red:T.org,marginBottom:2}}>{rv.severity==="HARD"?"BLOCKED":"WARNING"} — {rv.rule||""}</div>
+          <div style={{fontSize:12,color:T.txt2}}>{rv.details||""}</div>
         </div>)}
       </div>}
 
-      {/* CASH DEPLOYMENT */}
-      {strategy.cashDeployment&&<div style={{background:T.card,borderRadius:10,padding:"14px 16px",marginBottom:11,border:"1px solid "+T.border}}>
+      {/* Cash Deployment */}
+      {cashDep&&<div style={{background:T.card,borderRadius:10,padding:"14px 16px",marginBottom:11,border:"1px solid "+T.border}}>
         <div style={{fontSize:13,fontWeight:700,color:T.txt,marginBottom:3}}>Cash Deployment</div>
-        <div style={{fontSize:12,color:T.txt3,marginBottom:10}}>{fE(strategy.cashDeployment.available)} available in Espace Libre</div>
-        {(strategy.cashDeployment.suggestions||[]).map((s,i)=><div key={i} style={{background:T.blueT,padding:"10px 12px",borderRadius:7,marginBottom:6,border:"1px solid "+T.border}}>
-          <div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}>
-            <span style={{fontSize:13,fontWeight:700,color:T.txt}}>{s.name} ({s.ticker})</span>
-            <span style={{fontSize:12,fontWeight:700,color:T.blueA}} className="mono">{fE(s.amount)} · {s.leverage}</span>
+        <div style={{fontSize:12,color:T.txt3,marginBottom:10}}>{safeE(cashDep.available)} available in Espace Libre</div>
+        {cashSugs.map((sg,i)=><div key={i} style={{background:T.blueT,padding:"10px 12px",borderRadius:7,marginBottom:6,border:"1px solid "+T.border}}>
+          <div style={{display:"flex",justifyContent:"space-between",marginBottom:3,flexWrap:"wrap",gap:4}}>
+            <span style={{fontSize:13,fontWeight:700,color:T.txt}}>{sg.name||"—"} {sg.ticker?"("+sg.ticker+")":""}</span>
+            <span style={{fontSize:12,fontWeight:700,color:T.blueA}} className="mono">{safeE(sg.amount)} · {sg.leverage||""}</span>
           </div>
-          <div style={{fontSize:12,color:T.txt2,lineHeight:1.4}}>{s.reasoning}</div>
+          <div style={{fontSize:12,color:T.txt2,lineHeight:1.4}}>{sg.reasoning||""}</div>
         </div>)}
       </div>}
 
-      {/* POSITION STATUS */}
-      {strategy.positionSummaries?.length>0&&<div style={{background:T.card,borderRadius:10,padding:"14px 16px",marginBottom:11,border:"1px solid "+T.border}}>
+      {/* Position Status */}
+      {posSummaries.length>0&&<div style={{background:T.card,borderRadius:10,padding:"14px 16px",marginBottom:11,border:"1px solid "+T.border}}>
         <div style={{fontSize:13,fontWeight:700,color:T.txt,marginBottom:8}}>Position Status</div>
-        {strategy.positionSummaries.map((ps,i)=><div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"9px 0",borderBottom:i<strategy.positionSummaries.length-1?"1px solid "+T.borderL:"none"}}>
+        {posSummaries.map((ps,i)=><div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"9px 0",borderBottom:i<posSummaries.length-1?"1px solid "+T.borderL:"none"}}>
           <div style={{flex:1,marginRight:10}}>
-            <div style={{fontSize:13,fontWeight:600,color:T.txt}}>{ps.name}</div>
-            <div style={{fontSize:11,color:T.txt2,marginTop:1,lineHeight:1.4}}>{ps.status}</div>
+            <div style={{fontSize:13,fontWeight:600,color:T.txt}}>{ps.name||""}</div>
+            <div style={{fontSize:11,color:T.txt2,marginTop:1,lineHeight:1.4}}>{ps.status||""}</div>
           </div>
-          <span style={{fontSize:9,fontWeight:700,color:ps.priority==="HIGH"?T.red:ps.priority==="MEDIUM"?T.org:T.txt3,textTransform:"uppercase",whiteSpace:"nowrap"}}>{ps.priority}</span>
+          {ps.priority&&<span style={{fontSize:9,fontWeight:700,color:ps.priority==="HIGH"?T.red:ps.priority==="MEDIUM"?T.org:T.txt3,textTransform:"uppercase",whiteSpace:"nowrap"}}>{ps.priority}</span>}
         </div>)}
       </div>}
 
-      {/* ACTIONS */}
-      {strategy.actions?.length>0&&<div style={{background:T.card,borderRadius:10,padding:"14px 16px",marginBottom:11,border:"1px solid "+T.border}}>
+      {/* Actions */}
+      {actions.length>0&&<div style={{background:T.card,borderRadius:10,padding:"14px 16px",marginBottom:11,border:"1px solid "+T.border}}>
         <div style={{fontSize:13,fontWeight:700,color:T.txt,marginBottom:10}}>Recommended Actions</div>
-        {strategy.actions.map((a,i)=>{const u={IMMEDIATE:T.red,THIS_WEEK:T.org,MONITOR:T.blueA};
-          return <div key={i} style={{border:"1px solid "+(a.urgency==="IMMEDIATE"?T.red+"40":a.urgency==="THIS_WEEK"?T.org+"40":T.border),borderRadius:8,padding:12,marginBottom:7,background:a.urgency==="IMMEDIATE"?T.redBg:a.urgency==="THIS_WEEK"?T.orgBg:T.inputBg}}>
-            <div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}>
-              <span style={{fontSize:12,fontWeight:700,color:T.txt}}>{a.type.replace(/_/g," ")}</span>
-              <span style={{fontSize:9,fontWeight:700,color:u[a.urgency]||T.txt3,textTransform:"uppercase"}}>{a.urgency.replace(/_/g," ")}</span>
+        {actions.map((a,i)=>{
+          const u={IMMEDIATE:T.red,THIS_WEEK:T.org,MONITOR:T.blueA};
+          const aType=String(a.type||"HOLD").replace(/_/g," ");
+          const aUrgency=String(a.urgency||"MONITOR").replace(/_/g," ");
+          const bg=a.urgency==="IMMEDIATE"?T.redBg:a.urgency==="THIS_WEEK"?T.orgBg:T.inputBg;
+          const bdrColor=a.urgency==="IMMEDIATE"?T.red+"40":a.urgency==="THIS_WEEK"?T.org+"40":T.border;
+          return <div key={i} style={{border:"1px solid "+bdrColor,borderRadius:8,padding:12,marginBottom:7,background:bg}}>
+            <div style={{display:"flex",justifyContent:"space-between",marginBottom:5,flexWrap:"wrap",gap:4}}>
+              <span style={{fontSize:12,fontWeight:700,color:T.txt}}>{aType}</span>
+              <span style={{fontSize:9,fontWeight:700,color:u[a.urgency]||T.txt3,textTransform:"uppercase"}}>{aUrgency}</span>
             </div>
-            <div style={{fontSize:11,color:T.txt3,marginBottom:5}}>{a.position}</div>
+            {a.position&&<div style={{fontSize:11,color:T.txt3,marginBottom:5}}>{a.position}</div>}
             <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:6}}>
-              {a.turboPrice!=null&&<span style={{background:T.card,borderRadius:5,padding:"3px 8px",border:"1px solid "+T.borderL,fontSize:11}} className="mono">Price €{a.turboPrice}</span>}
-              {a.quantity!=null&&<span style={{background:T.card,borderRadius:5,padding:"3px 8px",border:"1px solid "+T.borderL,fontSize:11}} className="mono">Qty {a.quantity}</span>}
-              {a.profitOrLoss!=null&&<span style={{background:T.card,borderRadius:5,padding:"3px 8px",border:"1px solid "+T.borderL,fontSize:11,color:a.profitOrLoss>=0?T.grn:T.red}} className="mono">P&L {fS(a.profitOrLoss)}</span>}
-              {a.amount!=null&&<span style={{background:T.card,borderRadius:5,padding:"3px 8px",border:"1px solid "+T.borderL,fontSize:11}} className="mono">€{a.amount}</span>}
+              {a.turboPrice!=null&&typeof a.turboPrice==="number"&&<span style={{background:T.card,borderRadius:5,padding:"3px 8px",border:"1px solid "+T.borderL,fontSize:11}} className="mono">Price €{a.turboPrice}</span>}
+              {a.quantity!=null&&typeof a.quantity==="number"&&<span style={{background:T.card,borderRadius:5,padding:"3px 8px",border:"1px solid "+T.borderL,fontSize:11}} className="mono">Qty {a.quantity}</span>}
+              {a.profitOrLoss!=null&&typeof a.profitOrLoss==="number"&&<span style={{background:T.card,borderRadius:5,padding:"3px 8px",border:"1px solid "+T.borderL,fontSize:11,color:a.profitOrLoss>=0?T.grn:T.red}} className="mono">P&L {fS(a.profitOrLoss)}</span>}
+              {a.amount!=null&&typeof a.amount==="number"&&<span style={{background:T.card,borderRadius:5,padding:"3px 8px",border:"1px solid "+T.borderL,fontSize:11}} className="mono">€{a.amount}</span>}
             </div>
-            <div style={{fontSize:12,color:T.txt2,lineHeight:1.5}}>{a.reasoning}</div>
+            {a.reasoning&&<div style={{fontSize:12,color:T.txt2,lineHeight:1.5}}>{a.reasoning}</div>}
           </div>;
         })}
       </div>}
 
       <div style={{display:"grid",gridTemplateColumns:"1fr",gap:8}}>
-        {strategy.keyRisks&&<div style={{background:T.card,borderRadius:10,padding:"14px 16px",border:"1px solid "+T.border}}>
+        {keyRisks.length>0&&<div style={{background:T.card,borderRadius:10,padding:"14px 16px",border:"1px solid "+T.border}}>
           <div style={{fontSize:13,fontWeight:700,color:T.txt,marginBottom:7}}>Key Risks</div>
-          {strategy.keyRisks.map((r,i)=><div key={i} style={{fontSize:12,color:T.txt2,lineHeight:1.45,padding:"5px 0",borderBottom:i<strategy.keyRisks.length-1?"1px solid "+T.borderL:"none"}}>{r}</div>)}
+          {keyRisks.map((r,i)=><div key={i} style={{fontSize:12,color:T.txt2,lineHeight:1.45,padding:"5px 0",borderBottom:i<keyRisks.length-1?"1px solid "+T.borderL:"none"}}>{String(r||"")}</div>)}
         </div>}
-        {strategy.outlook&&<div style={{background:T.card,borderRadius:10,padding:"14px 16px",border:"1px solid "+T.border}}>
+        {s.outlook&&<div style={{background:T.card,borderRadius:10,padding:"14px 16px",border:"1px solid "+T.border}}>
           <div style={{fontSize:13,fontWeight:700,color:T.txt,marginBottom:7}}>Outlook</div>
-          <div style={{fontSize:12,color:T.txt2,lineHeight:1.55}}>{strategy.outlook}</div>
+          <div style={{fontSize:12,color:T.txt2,lineHeight:1.55}}>{s.outlook}</div>
         </div>}
       </div>
-    </>}
+    </div>}
 
     {!strategy&&!stratLoad&&<div style={{background:T.card,borderRadius:10,padding:30,textAlign:"center",border:"1px solid "+T.border}}>
       <div style={{fontSize:14,fontWeight:600,color:T.txt}}>No analysis yet</div>
       <div style={{fontSize:12,color:T.txt3,marginTop:5}}>Tap "Run Analysis" or upload a screenshot to start.</div>
     </div>}
-  </>;
+  </div>;
 }
 
 // ══════════ EVENTS TAB ══════════
